@@ -10,11 +10,7 @@ export function formatCurrency(amount: number, currency?: Currency): string {
   const defaultCurrency = { code: "USD", symbol: "$", name: "Dólar estadounidense" }
   const currencyToUse = currency || defaultCurrency
 
-  return new Intl.NumberFormat("es-ES", {
-    style: "currency",
-    currency: currencyToUse.code,
-    minimumFractionDigits: 2,
-  }).format(amount)
+  return `${currencyToUse.symbol} ${amount.toLocaleString("es-CO")} ${currencyToUse.code}`
 }
 
 export function generateId(): string {

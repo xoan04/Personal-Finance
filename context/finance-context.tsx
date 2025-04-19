@@ -62,7 +62,11 @@ const initialData: FinanceData = {
 type FinanceContextType = {
   data: FinanceData
   addExpense: (expense: Omit<Expense, "id">) => Promise<void>
+  updateExpense: (expense: Expense) => Promise<void>
+  deleteExpense: (id: string) => Promise<void>
   addIncome: (income: Omit<Income, "id">) => Promise<void>
+  updateIncome: (income: Income) => Promise<void>
+  deleteIncome: (id: string) => Promise<void>
   addGoal: (goal: Omit<Goal, "id">) => Promise<void>
   updateGoal: (goal: Goal) => Promise<void>
   deleteGoal: (id: string) => Promise<void>
@@ -306,6 +310,64 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const updateExpense = async (expenseToUpdate: Expense) => {
+    try {
+      if (user) {
+        const transactionsRef = doc(db, "transactions", user.uid)
+        const transactionsDoc = await getDoc(transactionsRef)
+
+        if (transactionsDoc.exists()) {
+          const currentExpenses = transactionsDoc.data().expenses || []
+          const updatedExpenses = currentExpenses.map((expense: Expense) =>
+            expense.id === expenseToUpdate.id ? expenseToUpdate : expense
+          )
+
+          await updateDoc(transactionsRef, {
+            expenses: updatedExpenses,
+            updatedAt: new Date()
+          })
+        }
+      }
+
+      setData(prev => ({
+        ...prev,
+        expenses: prev.expenses.map(expense => 
+          expense.id === expenseToUpdate.id ? expenseToUpdate : expense
+        ),
+      }))
+    } catch (error) {
+      console.error("Error al actualizar gasto:", error)
+      throw error
+    }
+  }
+
+  const deleteExpense = async (id: string) => {
+    try {
+      if (user) {
+        const transactionsRef = doc(db, "transactions", user.uid)
+        const transactionsDoc = await getDoc(transactionsRef)
+
+        if (transactionsDoc.exists()) {
+          const currentExpenses = transactionsDoc.data().expenses || []
+          const updatedExpenses = currentExpenses.filter((expense: Expense) => expense.id !== id)
+
+          await updateDoc(transactionsRef, {
+            expenses: updatedExpenses,
+            updatedAt: new Date()
+          })
+        }
+      }
+
+      setData(prev => ({
+        ...prev,
+        expenses: prev.expenses.filter(expense => expense.id !== id),
+      }))
+    } catch (error) {
+      console.error("Error al eliminar gasto:", error)
+      throw error
+    }
+  }
+
   const addIncome = async (income: Omit<Income, "id">) => {
     try {
       const newIncome = {
@@ -340,6 +402,64 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       }))
     } catch (error) {
       console.error("Error al añadir ingreso:", error)
+      throw error
+    }
+  }
+
+  const updateIncome = async (incomeToUpdate: Income) => {
+    try {
+      if (user) {
+        const transactionsRef = doc(db, "transactions", user.uid)
+        const transactionsDoc = await getDoc(transactionsRef)
+
+        if (transactionsDoc.exists()) {
+          const currentIncomes = transactionsDoc.data().incomes || []
+          const updatedIncomes = currentIncomes.map((income: Income) =>
+            income.id === incomeToUpdate.id ? incomeToUpdate : income
+          )
+
+          await updateDoc(transactionsRef, {
+            incomes: updatedIncomes,
+            updatedAt: new Date()
+          })
+        }
+      }
+
+      setData(prev => ({
+        ...prev,
+        incomes: prev.incomes.map(income => 
+          income.id === incomeToUpdate.id ? incomeToUpdate : income
+        ),
+      }))
+    } catch (error) {
+      console.error("Error al actualizar ingreso:", error)
+      throw error
+    }
+  }
+
+  const deleteIncome = async (id: string) => {
+    try {
+      if (user) {
+        const transactionsRef = doc(db, "transactions", user.uid)
+        const transactionsDoc = await getDoc(transactionsRef)
+
+        if (transactionsDoc.exists()) {
+          const currentIncomes = transactionsDoc.data().incomes || []
+          const updatedIncomes = currentIncomes.filter((income: Income) => income.id !== id)
+
+          await updateDoc(transactionsRef, {
+            incomes: updatedIncomes,
+            updatedAt: new Date()
+          })
+        }
+      }
+
+      setData(prev => ({
+        ...prev,
+        incomes: prev.incomes.filter(income => income.id !== id),
+      }))
+    } catch (error) {
+      console.error("Error al eliminar ingreso:", error)
       throw error
     }
   }
@@ -628,7 +748,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       value={{
         data,
         addExpense,
+        updateExpense,
+        deleteExpense,
         addIncome,
+        updateIncome,
+        deleteIncome,
         addGoal,
         updateGoal,
         deleteGoal,

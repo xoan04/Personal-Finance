@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,173 +17,166 @@ import { CalendarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useFinance } from "@/context/finance-context"
 import { toast } from "@/components/ui/use-toast"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
-interface ExpenseFormProps {
-  onClose: () => void
+export interface Expense {
+  id: string
+  description: string
+  amount: number
+  date: string
+  category: string
+  notes?: string
 }
 
-export default function ExpenseForm({ onClose }: ExpenseFormProps) {
-  const { addExpense, data } = useFinance()
-  const { currency } = data
-  const [date, setDate] = useState<Date>(new Date())
-  const [description, setDescription] = useState("")
-  const [amount, setAmount] = useState("")
-  const [category, setCategory] = useState("")
-  const [notes, setNotes] = useState("")
+export interface ExpenseFormProps {
+  onClose?: () => void
+  editingExpense?: Expense
+}
+
+export function ExpenseForm({ onClose, editingExpense }: ExpenseFormProps) {
+  const { addExpense, updateExpense } = useFinance()
+  const [date, setDate] = useState(
+    editingExpense?.date 
+      ? new Date(editingExpense.date).toISOString().split("T")[0]
+      : new Date().toISOString().split("T")[0]
+  )
+  const [description, setDescription] = useState(editingExpense?.description || "")
+  const [amount, setAmount] = useState<string>(editingExpense?.amount?.toString() || "")
+  const [formattedAmount, setFormattedAmount] = useState("")
+  const [category, setCategory] = useState(editingExpense?.category || "")
+  const [notes, setNotes] = useState(editingExpense?.notes || "")
+
+  useEffect(() => {
+    if (editingExpense?.amount) {
+      const formatted = editingExpense.amount.toLocaleString("es-CO")
+      setFormattedAmount(formatted)
+    }
+  }, [editingExpense])
+
+  const formatNumber = (value: string) => {
+    // Eliminar cualquier caracter que no sea número
+    const number = value.replace(/\D/g, "")
+    // Convertir a número y formatear con separadores de miles
+    return number ? Number(number).toLocaleString("es-CO") : ""
+  }
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/[^\d]/g, "")
+    setAmount(value)
+    
+    if (value) {
+      const number = parseInt(value, 10)
+      const formatted = number.toLocaleString("es-CO")
+      setFormattedAmount(formatted)
+    } else {
+      setFormattedAmount("")
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!description || !amount || !category) return
 
-    if (!description || !amount || !category || !date) {
-      toast({
-        title: "Error",
-        description: "Por favor completa todos los campos requeridos",
-        variant: "destructive",
-      })
-      return
+    const expenseData = {
+      description,
+      amount: parseFloat(amount.replace(/[^\d]/g, "")),
+      date: new Date(date).toISOString(),
+      category,
+      notes,
     }
 
-    addExpense({
-      description,
-      amount: Number.parseFloat(amount),
-      category,
-      date: date.toISOString().split("T")[0],
-      notes,
-    })
+    if (editingExpense) {
+      updateExpense({
+        ...expenseData,
+        id: editingExpense.id
+      })
+    } else {
+      addExpense(expenseData)
+    }
 
-    toast({
-      title: "Gasto añadido",
-      description: "El gasto ha sido registrado correctamente",
-    })
-
-    onClose()
+    // Reset form
+    setDescription("")
+    setAmount("")
+    setFormattedAmount("")
+    setDate(new Date().toISOString().split("T")[0])
+    setCategory("")
+    setNotes("")
+    if (onClose) onClose()
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-background rounded-lg w-full max-w-md p-4 sm:p-6 relative max-h-[90vh] overflow-y-auto">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="absolute right-2 sm:right-4 top-2 sm:top-4" 
-          onClick={onClose}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-
-        <h2 className="text-lg sm:text-xl font-bold mb-4">Añadir Gasto</h2>
-
-        <form className="space-y-4" onSubmit={handleSubmit}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-background rounded-lg w-full max-w-md p-6 shadow-lg">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold">
+            {editingExpense ? "Editar Gasto" : "Agregar Gasto"}
+          </h2>
+          {onClose && (
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="description" className="text-sm font-medium">
-              Descripción
-            </Label>
+            <Label htmlFor="description">Descripción</Label>
             <Input
               id="description"
-              placeholder="Ej: Compra en supermercado"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              required
-              className="w-full"
+              placeholder="Descripción del gasto"
             />
           </div>
-
           <div className="space-y-2">
-            <Label htmlFor="amount" className="text-sm font-medium">
-              Monto
-            </Label>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">
-                {currency.symbol}
-              </span>
-              <Input
-                id="amount"
-                type="number"
-                className="pl-7 w-full"
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                step="0.01"
-                min="0"
-                required
-              />
-            </div>
+            <Label htmlFor="amount">Monto</Label>
+            <Input
+              id="amount"
+              type="text"
+              value={formattedAmount}
+              onChange={handleAmountChange}
+              placeholder="0"
+            />
           </div>
-
           <div className="space-y-2">
-            <Label htmlFor="category" className="text-sm font-medium">
-              Categoría
-            </Label>
-            <Select value={category} onValueChange={setCategory} required>
-              <SelectTrigger id="category" className="w-full">
+            <Label htmlFor="date">Fecha</Label>
+            <Input
+              id="date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="category">Categoría</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger>
                 <SelectValue placeholder="Selecciona una categoría" />
               </SelectTrigger>
-              <SelectContent className="max-h-[200px]">
-                <SelectItem value="housing">Vivienda</SelectItem>
-                <SelectItem value="food">Alimentación</SelectItem>
-                <SelectItem value="transport">Transporte</SelectItem>
-                <SelectItem value="utilities">Servicios</SelectItem>
-                <SelectItem value="entertainment">Entretenimiento</SelectItem>
-                <SelectItem value="health">Salud</SelectItem>
-                <SelectItem value="other">Otros</SelectItem>
+              <SelectContent>
+                <SelectItem value="alimentacion">Alimentación</SelectItem>
+                <SelectItem value="transporte">Transporte</SelectItem>
+                <SelectItem value="servicios">Servicios</SelectItem>
+                <SelectItem value="entretenimiento">Entretenimiento</SelectItem>
+                <SelectItem value="salud">Salud</SelectItem>
+                <SelectItem value="otros">Otros</SelectItem>
               </SelectContent>
             </Select>
           </div>
-
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Fecha</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button 
-                  variant={"outline"} 
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "PPP", { locale: es }) : "Selecciona una fecha"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar 
-                  mode="single" 
-                  selected={date} 
-                  onSelect={(date) => date && setDate(date)} 
-                  initialFocus 
-                  className="rounded-md border"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="notes" className="text-sm font-medium">
-              Notas (opcional)
-            </Label>
+            <Label htmlFor="notes">Notas (opcional)</Label>
             <Textarea
               id="notes"
-              placeholder="Añade detalles adicionales"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full min-h-[100px]"
+              placeholder="Notas adicionales"
             />
           </div>
-
-          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={onClose}
-              className="w-full sm:w-auto"
-            >
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button variant="outline" onClick={onClose}>
               Cancelar
             </Button>
-            <Button 
-              type="submit"
-              className="w-full sm:w-auto"
-            >
-              Guardar
+            <Button type="submit">
+              {editingExpense ? "Actualizar" : "Agregar"}
             </Button>
           </div>
         </form>

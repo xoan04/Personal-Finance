@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -23,14 +23,62 @@ export default function FutureGoals() {
   const [showAddFundsDialog, setShowAddFundsDialog] = useState(false)
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null)
   const [fundsToAdd, setFundsToAdd] = useState("")
+  const [formattedFundsToAdd, setFormattedFundsToAdd] = useState("")
+  const [progressValues, setProgressValues] = useState<Record<string, number>>({})
 
   // Estados para el formulario de metas
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [targetAmount, setTargetAmount] = useState("")
+  const [formattedTargetAmount, setFormattedTargetAmount] = useState("")
   const [currentAmount, setCurrentAmount] = useState("")
+  const [formattedCurrentAmount, setFormattedCurrentAmount] = useState("")
   const [deadline, setDeadline] = useState("")
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null)
+
+  // Efecto para actualizar los valores de progreso cuando cambian las metas
+  useEffect(() => {
+    const newProgressValues = data.goals.reduce((acc, goal) => {
+      const progress = (goal.currentAmount / goal.targetAmount) * 100
+      acc[goal.id] = Math.min(progress, 100) // Asegurar que no exceda el 100%
+      return acc
+    }, {} as Record<string, number>)
+    setProgressValues(newProgressValues)
+  }, [data.goals])
+
+  const formatNumber = (value: string) => {
+    // Eliminar cualquier caracter que no sea número
+    const number = value.replace(/\D/g, "")
+    // Convertir a número y formatear con separadores de miles
+    return number ? Number(number).toLocaleString("es-CO") : ""
+  }
+
+  const handleTargetAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    // Guardar el valor sin formato para el submit
+    const cleanValue = value.replace(/\D/g, "")
+    setTargetAmount(cleanValue)
+    // Mostrar el valor formateado en el input
+    setFormattedTargetAmount(formatNumber(value))
+  }
+
+  const handleCurrentAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    // Guardar el valor sin formato para el submit
+    const cleanValue = value.replace(/\D/g, "")
+    setCurrentAmount(cleanValue)
+    // Mostrar el valor formateado en el input
+    setFormattedCurrentAmount(formatNumber(value))
+  }
+
+  const handleFundsToAddChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    // Guardar el valor sin formato para el submit
+    const cleanValue = value.replace(/\D/g, "")
+    setFundsToAdd(cleanValue)
+    // Mostrar el valor formateado en el input
+    setFormattedFundsToAdd(formatNumber(value))
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,8 +95,8 @@ export default function FutureGoals() {
     const goalData = {
       title,
       description,
-      targetAmount: Number.parseFloat(targetAmount),
-      currentAmount: currentAmount ? Number.parseFloat(currentAmount) : 0,
+      targetAmount: Number(targetAmount),
+      currentAmount: currentAmount ? Number(currentAmount) : 0,
       deadline,
     }
 
@@ -100,8 +148,8 @@ export default function FutureGoals() {
     })
   }
 
-  const handleAddFunds = () => {
-    if (!selectedGoalId || !fundsToAdd || Number.parseFloat(fundsToAdd) <= 0) {
+  const handleAddFunds = async () => {
+    if (!selectedGoalId || !fundsToAdd || Number(fundsToAdd) <= 0) {
       toast({
         title: "Error",
         description: "Por favor ingresa un monto válido",
@@ -110,15 +158,36 @@ export default function FutureGoals() {
       return
     }
 
-    addFundsToGoal(selectedGoalId, Number.parseFloat(fundsToAdd))
-    setShowAddFundsDialog(false)
-    setFundsToAdd("")
-    setSelectedGoalId(null)
+    try {
+      await addFundsToGoal(selectedGoalId, Number(fundsToAdd))
+      
+      // Actualizar el progreso inmediatamente
+      const goal = data.goals.find(g => g.id === selectedGoalId)
+      if (goal) {
+        const newAmount = goal.currentAmount + Number(fundsToAdd)
+        const newProgress = Math.min((newAmount / goal.targetAmount) * 100, 100)
+        setProgressValues(prev => ({
+          ...prev,
+          [selectedGoalId]: newProgress
+        }))
+      }
 
-    toast({
-      title: "Fondos añadidos",
-      description: "Los fondos han sido añadidos correctamente a tu meta",
-    })
+      setShowAddFundsDialog(false)
+      setFundsToAdd("")
+      setFormattedFundsToAdd("")
+      setSelectedGoalId(null)
+
+      toast({
+        title: "Fondos añadidos",
+        description: "Los fondos han sido añadidos correctamente a tu meta",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Hubo un error al añadir los fondos",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -176,13 +245,12 @@ export default function FutureGoals() {
                     <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">{currency.symbol}</span>
                     <Input
                       id="targetAmount"
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       className="pl-7 w-full"
-                      placeholder="0.00"
-                      value={targetAmount}
-                      onChange={(e) => setTargetAmount(e.target.value)}
-                      step="0.01"
-                      min="0"
+                      placeholder="0"
+                      value={formattedTargetAmount}
+                      onChange={handleTargetAmountChange}
                       required
                     />
                   </div>
@@ -194,13 +262,12 @@ export default function FutureGoals() {
                     <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">{currency.symbol}</span>
                     <Input
                       id="currentAmount"
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       className="pl-7 w-full"
-                      placeholder="0.00"
-                      value={currentAmount}
-                      onChange={(e) => setCurrentAmount(e.target.value)}
-                      step="0.01"
-                      min="0"
+                      placeholder="0"
+                      value={formattedCurrentAmount}
+                      onChange={handleCurrentAmountChange}
                     />
                   </div>
                 </div>
@@ -279,9 +346,20 @@ export default function FutureGoals() {
                     </span>
                   </div>
                   <Progress 
-                    value={(goal.currentAmount / goal.targetAmount) * 100} 
-                    className="h-2"
-                  />
+                    value={progressValues[goal.id]} 
+                    className="h-2 transition-all duration-700 ease-in-out bg-secondary"
+                    style={{
+                      background: 'hsl(var(--secondary))',
+                    }}
+                  >
+                    <div
+                      className="h-full bg-primary transition-all duration-700 ease-in-out"
+                      style={{
+                        width: `${progressValues[goal.id]}%`,
+                        background: 'hsl(var(--primary))',
+                      }}
+                    />
+                  </Progress>
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <span className="text-sm text-muted-foreground">
                       Fecha límite: {goal.deadline}
@@ -319,13 +397,12 @@ export default function FutureGoals() {
                 </span>
                 <Input
                   id="funds"
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   className="pl-7 w-full"
-                  placeholder="0.00"
-                  value={fundsToAdd}
-                  onChange={(e) => setFundsToAdd(e.target.value)}
-                  step="0.01"
-                  min="0"
+                  placeholder="0"
+                  value={formattedFundsToAdd}
+                  onChange={handleFundsToAddChange}
                 />
               </div>
             </div>

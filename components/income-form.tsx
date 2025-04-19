@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import type { Income } from "@/lib/types"
 
 import { useState } from "react"
 import { X } from "lucide-react"
@@ -20,18 +21,38 @@ import { toast } from "@/components/ui/use-toast"
 
 interface IncomeFormProps {
   onClose: () => void
+  editingIncome?: Income
 }
 
-export default function IncomeForm({ onClose }: IncomeFormProps) {
-  const { addIncome, data } = useFinance()
-  const { currency } = data
-  const [date, setDate] = useState<Date>(new Date())
-  const [description, setDescription] = useState("")
-  const [amount, setAmount] = useState("")
-  const [category, setCategory] = useState("")
-  const [notes, setNotes] = useState("")
+const formatNumber = (value: string) => {
+  // Eliminar cualquier caracter que no sea número
+  const number = value.replace(/\D/g, "")
+  // Convertir a número y formatear con separadores de miles
+  return number ? Number(number).toLocaleString("es-CO") : ""
+}
 
-  const handleSubmit = (e: React.FormEvent) => {
+export default function IncomeForm({ onClose, editingIncome }: IncomeFormProps) {
+  const { addIncome, updateIncome, data } = useFinance()
+  const { currency } = data
+  const [date, setDate] = useState<Date>(editingIncome ? new Date(editingIncome.date) : new Date())
+  const [description, setDescription] = useState(editingIncome?.description || "")
+  const [amount, setAmount] = useState(editingIncome?.amount.toString() || "")
+  const [formattedAmount, setFormattedAmount] = useState(
+    editingIncome ? formatNumber(editingIncome.amount.toString()) : ""
+  )
+  const [category, setCategory] = useState(editingIncome?.category || "")
+  const [notes, setNotes] = useState(editingIncome?.notes || "")
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    // Guardar el valor sin formato para el submit
+    const cleanValue = value.replace(/\D/g, "")
+    setAmount(cleanValue)
+    // Mostrar el valor formateado en el input
+    setFormattedAmount(formatNumber(value))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!description || !amount || !category || !date) {
@@ -43,20 +64,41 @@ export default function IncomeForm({ onClose }: IncomeFormProps) {
       return
     }
 
-    addIncome({
-      description,
-      amount: Number.parseFloat(amount),
-      category,
-      date: date.toISOString().split("T")[0],
-      notes,
-    })
+    try {
+      const incomeData = {
+        description,
+        amount: Number(amount),
+        category,
+        date: date.toISOString().split("T")[0],
+        notes,
+      }
 
-    toast({
-      title: "Ingreso añadido",
-      description: "El ingreso ha sido registrado correctamente",
-    })
+      if (editingIncome) {
+        await updateIncome({
+          ...incomeData,
+          id: editingIncome.id,
+          createdAt: editingIncome.createdAt,
+        })
+        toast({
+          title: "Ingreso actualizado",
+          description: "El ingreso ha sido actualizado correctamente",
+        })
+      } else {
+        await addIncome(incomeData)
+        toast({
+          title: "Ingreso añadido",
+          description: "El ingreso ha sido registrado correctamente",
+        })
+      }
 
-    onClose()
+      onClose()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Hubo un error al procesar el ingreso",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -71,7 +113,9 @@ export default function IncomeForm({ onClose }: IncomeFormProps) {
           <X className="h-4 w-4" />
         </Button>
 
-        <h2 className="text-lg sm:text-xl font-bold mb-4">Añadir Ingreso</h2>
+        <h2 className="text-lg sm:text-xl font-bold mb-4">
+          {editingIncome ? "Editar Ingreso" : "Añadir Ingreso"}
+        </h2>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
@@ -98,13 +142,12 @@ export default function IncomeForm({ onClose }: IncomeFormProps) {
               </span>
               <Input
                 id="amount"
-                type="number"
+                type="text"
+                inputMode="numeric"
                 className="pl-7 w-full"
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                step="0.01"
-                min="0"
+                placeholder="0"
+                value={formattedAmount}
+                onChange={handleAmountChange}
                 required
               />
             </div>

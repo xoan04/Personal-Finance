@@ -4,10 +4,11 @@ import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, Loader2 } from "lucide-react"
-
+import { PlusCircle, Loader2, Pencil, Trash2 } from "lucide-react"
+import { toast } from "@/components/ui/use-toast"
+import type { Expense, Income } from "@/lib/types"
 import BudgetOverview from "@/components/budget-overview"
-import ExpenseForm from "@/components/expense-form"
+import { ExpenseForm } from "@/components/expense-form"
 import IncomeForm from "@/components/income-form"
 import ExpenseChart from "@/components/expense-chart"
 import CategoryBreakdown from "@/components/category-breakdown"
@@ -18,6 +19,7 @@ import { CurrencySelector } from "@/components/currency-selector"
 import { UserNav } from "@/components/user-nav"
 import { useAuth } from "@/context/auth-context"
 import ProtectedRoute from "@/components/protected-route"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 
 export default function Home() {
   const [showExpenseForm, setShowExpenseForm] = useState(false)
@@ -90,13 +92,14 @@ export default function Home() {
           </div>
 
           <Tabs defaultValue="overview" className="mb-6">
-            <div className="relative w-full mb-4 overflow-hidden">
-              <div className="overflow-x-auto pb-2 -mb-2">
-                <TabsList className="w-max min-w-full flex justify-start">
-                  <TabsTrigger value="overview" className="whitespace-nowrap">Resumen</TabsTrigger>
-                  <TabsTrigger value="expenses" className="whitespace-nowrap">Gastos</TabsTrigger>
-                  <TabsTrigger value="budget" className="whitespace-nowrap">Presupuesto 50/30/20</TabsTrigger>
-                  <TabsTrigger value="goals" className="whitespace-nowrap">Metas Futuras</TabsTrigger>
+            <div className="relative w-full mb-4">
+              <div className="overflow-x-auto scrollbar-none">
+                <TabsList className="inline-flex w-full sm:w-auto h-auto p-1 bg-muted/50">
+                  <TabsTrigger value="overview" className="text-sm px-2.5 py-1.5">Resumen</TabsTrigger>
+                  <TabsTrigger value="expenses" className="text-sm px-2.5 py-1.5">Gastos</TabsTrigger>
+                  <TabsTrigger value="income" className="text-sm px-2.5 py-1.5">Ingresos</TabsTrigger>
+                  <TabsTrigger value="budget" className="text-sm px-2.5 py-1.5">Presupuesto</TabsTrigger>
+                  <TabsTrigger value="goals" className="text-sm px-2.5 py-1.5">Metas</TabsTrigger>
                 </TabsList>
               </div>
             </div>
@@ -131,6 +134,18 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   <ExpenseList />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="income">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Historial de Ingresos</CardTitle>
+                  <CardDescription>Todos tus ingresos recientes</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <IncomeList />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -192,11 +207,34 @@ export default function Home() {
 }
 
 function ExpenseList() {
-  const { data } = useFinance()
+  const { data, updateExpense, deleteExpense } = useFinance()
   const { currency } = data
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
 
   // Ordenar gastos por fecha (más recientes primero)
   const sortedExpenses = [...data.expenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+  const handleEdit = (expense: Expense) => {
+    setSelectedExpense(expense)
+    setShowEditForm(true)
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteExpense(id)
+      toast({
+        title: "Gasto eliminado",
+        description: "El gasto ha sido eliminado correctamente"
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Hubo un error al eliminar el gasto",
+        variant: "destructive"
+      })
+    }
+  }
 
   if (sortedExpenses.length === 0) {
     return <p className="text-center py-4 text-muted-foreground">No hay gastos registrados</p>
@@ -205,8 +243,8 @@ function ExpenseList() {
   return (
     <div className="space-y-4">
       {sortedExpenses.map((expense) => (
-        <div key={expense.id} className="flex justify-between py-2 border-b">
-          <div>
+        <div key={expense.id} className="flex items-center justify-between py-2 border-b">
+          <div className="flex-grow">
             <p className="font-medium">{expense.description}</p>
             <p className="text-sm text-muted-foreground">
               {new Date(expense.date).toLocaleDateString("es-ES", {
@@ -216,9 +254,118 @@ function ExpenseList() {
               })}
             </p>
           </div>
-          <p className="font-medium">{formatCurrency(expense.amount, currency)}</p>
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-red-600">{formatCurrency(expense.amount, currency)}</p>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="icon" onClick={() => handleEdit(expense)}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <DeleteConfirmationDialog
+                title="Eliminar Gasto"
+                description={`¿Estás seguro de que deseas eliminar el gasto "${expense.description}"? Esta acción no se puede deshacer.`}
+                onDelete={() => handleDelete(expense.id)}
+                trigger={
+                  <Button variant="ghost" size="icon">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                }
+              />
+            </div>
+          </div>
         </div>
       ))}
+
+      {showEditForm && selectedExpense && (
+        <ExpenseForm 
+          onClose={() => {
+            setShowEditForm(false)
+            setSelectedExpense(null)
+          }}
+          editingExpense={selectedExpense}
+        />
+      )}
+    </div>
+  )
+}
+
+function IncomeList() {
+  const { data, updateIncome, deleteIncome } = useFinance()
+  const { currency } = data
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [selectedIncome, setSelectedIncome] = useState<Income | null>(null)
+
+  // Ordenar ingresos por fecha (más recientes primero)
+  const sortedIncomes = [...data.incomes].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+  const handleEdit = (income: Income) => {
+    setSelectedIncome(income)
+    setShowEditForm(true)
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteIncome(id)
+      toast({
+        title: "Ingreso eliminado",
+        description: "El ingreso ha sido eliminado correctamente"
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Hubo un error al eliminar el ingreso",
+        variant: "destructive"
+      })
+    }
+  }
+
+  if (sortedIncomes.length === 0) {
+    return <p className="text-center py-4 text-muted-foreground">No hay ingresos registrados</p>
+  }
+
+  return (
+    <div className="space-y-4">
+      {sortedIncomes.map((income) => (
+        <div key={income.id} className="flex items-center justify-between py-2 border-b">
+          <div className="flex-grow">
+            <p className="font-medium">{income.description}</p>
+            <p className="text-sm text-muted-foreground">
+              {new Date(income.date).toLocaleDateString("es-ES", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-green-600">{formatCurrency(income.amount, currency)}</p>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="icon" onClick={() => handleEdit(income)}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <DeleteConfirmationDialog
+                title="Eliminar Ingreso"
+                description={`¿Estás seguro de que deseas eliminar el ingreso "${income.description}"? Esta acción no se puede deshacer.`}
+                onDelete={() => handleDelete(income.id)}
+                trigger={
+                  <Button variant="ghost" size="icon">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                }
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {showEditForm && selectedIncome && (
+        <IncomeForm 
+          onClose={() => {
+            setShowEditForm(false)
+            setSelectedIncome(null)
+          }}
+          editingIncome={selectedIncome}
+        />
+      )}
     </div>
   )
 }
