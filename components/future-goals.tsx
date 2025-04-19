@@ -14,6 +14,7 @@ import { useFinance } from "@/context/finance-context"
 import { formatCurrency } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 
 export default function FutureGoals() {
   const { data, addGoal, updateGoal, deleteGoal, addFundsToGoal } = useFinance()
@@ -92,13 +93,11 @@ export default function FutureGoals() {
   }
 
   const handleDelete = (id: string) => {
-    if (confirm("¿Estás seguro de que deseas eliminar esta meta?")) {
-      deleteGoal(id)
-      toast({
-        title: "Meta eliminada",
-        description: "La meta ha sido eliminada correctamente",
-      })
-    }
+    deleteGoal(id)
+    toast({
+      title: "Meta eliminada",
+      description: "La meta ha sido eliminada correctamente",
+    })
   }
 
   const handleAddFunds = () => {
@@ -257,9 +256,16 @@ export default function FutureGoals() {
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(goal)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(goal.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <DeleteConfirmationDialog
+                      title="Eliminar Meta"
+                      description={`¿Estás seguro de que deseas eliminar la meta "${goal.title}"? Esta acción no se puede deshacer.`}
+                      onDelete={() => handleDelete(goal.id)}
+                      trigger={
+                        <Button variant="ghost" size="icon">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      }
+                    />
                   </div>
                 </div>
                 <CardDescription className="text-sm">{goal.description}</CardDescription>

@@ -62,6 +62,7 @@ export interface BudgetRule {
     name: string
     percentage: number
     color: string
+    description?: string
   }[]
   isDefault?: boolean
 }

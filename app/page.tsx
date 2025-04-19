@@ -154,7 +154,7 @@ export default function Home() {
                 <p className="mb-2">¿Encontraste un error o tienes una sugerencia?</p>
                 <div className="flex items-center justify-center gap-2">
                   <a
-                    href="https://github.com/juan-/Personal-Finance/issues"
+                    href="https://github.com/xoan04/Personal-Finance/issues"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center text-primary hover:text-primary/80 transition-colors"
@@ -187,12 +187,7 @@ export default function Home() {
     </div>
   )
 
-  // Si el usuario está autenticado, mostrar el contenido protegido
-  if (user) {
-    return <ProtectedRoute>{content}</ProtectedRoute>
-  }
-
-  // Si no hay usuario, mostrar el contenido normal (se redirigirá en el componente ProtectedRoute)
+  // Retornar el contenido directamente sin el ProtectedRoute
   return content
 }
 

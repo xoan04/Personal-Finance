@@ -26,16 +26,31 @@ const initialData: FinanceData = {
   goals: [],
   monthlyExpenses: {},
   categoryBreakdown: [],
-  currency: { code: "USD", symbol: "$", name: "Dólar estadounidense" },
+  currency: { code: "COP", symbol: "$", name: "Peso Colombiano" },
   budgetRules: [
     {
       id: "50-30-20",
       name: "Regla 50/30/20",
-      description: "Distribución clásica para un presupuesto balanceado",
+      description: "La regla 50/30/20 es un método simple para presupuestar y ahorrar dinero, que divide los ingresos en tres categorías: 50% para necesidades básicas, 30% para deseos y 20% para ahorros.",
       categories: [
-        { name: "Necesidades", percentage: 50, color: "#0ea5e9" },
-        { name: "Deseos", percentage: 30, color: "#8b5cf6" },
-        { name: "Ahorros", percentage: 20, color: "#10b981" }
+        { 
+          name: "Necesidades", 
+          percentage: 50, 
+          color: "#0ea5e9",
+          description: "50% de tus ingresos para necesidades básicas como vivienda, alimentación, servicios públicos, transporte y gastos médicos esenciales."
+        },
+        { 
+          name: "Deseos", 
+          percentage: 30, 
+          color: "#8b5cf6",
+          description: "30% para gastos no esenciales como entretenimiento, compras discrecionales, salidas a comer y hobbies."
+        },
+        { 
+          name: "Ahorros", 
+          percentage: 20, 
+          color: "#10b981",
+          description: "20% destinado a ahorros, inversiones, fondo de emergencia y metas financieras a largo plazo."
+        }
       ],
       isDefault: true
     }
@@ -58,7 +73,7 @@ type FinanceContextType = {
   balance: number
   loading: boolean
   addBudgetRule: (rule: Omit<BudgetRule, "id">) => void
-  updateBudgetRule: (id: string, updates: Partial<BudgetRule>) => void
+  updateBudgetRule: (rule: BudgetRule) => void
   deleteBudgetRule: (id: string) => void
   setActiveBudgetRule: (id: string) => void
 }
@@ -79,7 +94,12 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const savedData = localStorage.getItem("financeData")
         if (savedData) {
           try {
-            setData(JSON.parse(savedData))
+            const parsedData = JSON.parse(savedData)
+            // Asegurar que la regla 50/30/20 esté presente
+            if (!parsedData.budgetRules.some((rule: BudgetRule) => rule.id === "50-30-20")) {
+              parsedData.budgetRules.unshift(initialData.budgetRules[0])
+            }
+            setData(parsedData)
           } catch (error) {
             console.error("Error al cargar datos locales:", error)
           }
@@ -106,33 +126,23 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           ? (goalsDoc.data().goals as Goal[])
           : []
 
+        // Cargar transacciones del usuario
+        const transactionsDoc = await getDoc(doc(db, "transactions", user.uid))
+        const userTransactions = transactionsDoc.exists()
+          ? transactionsDoc.data()
+          : { expenses: [], incomes: [] }
+
         if (userDoc.exists()) {
           // Cargar datos básicos del usuario
           const userData = userDoc.data() as { currency: Currency; activeBudgetRuleId: string }
 
-          // Cargar gastos
-          const expensesQuery = query(collection(db, "expenses"), where("userId", "==", user.uid))
-          const expensesSnapshot = await getDocs(expensesQuery)
-          const expenses = expensesSnapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as Expense[]
-
-          // Cargar ingresos
-          const incomesQuery = query(collection(db, "incomes"), where("userId", "==", user.uid))
-          const incomesSnapshot = await getDocs(incomesQuery)
-          const incomes = incomesSnapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as Income[]
-
           setData({
             ...initialData,
-            expenses,
-            incomes,
+            expenses: userTransactions.expenses || [],
+            incomes: userTransactions.incomes || [],
             goals: userGoals,
             currency: userData.currency || initialData.currency,
-            budgetRules: [...initialData.budgetRules, ...customBudgetRules],
+            budgetRules: [initialData.budgetRules[0], ...customBudgetRules],
             activeBudgetRuleId: userData.activeBudgetRuleId || initialData.activeBudgetRuleId,
           })
         } else {
@@ -150,6 +160,12 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             }),
             setDoc(doc(db, "goals", user.uid), {
               goals: [],
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }),
+            setDoc(doc(db, "transactions", user.uid), {
+              expenses: [],
+              incomes: [],
               createdAt: new Date(),
               updatedAt: new Date()
             })
@@ -254,38 +270,36 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   // Funciones para manipular datos
   const addExpense = async (expense: Omit<Expense, "id">) => {
     try {
-      if (user) {
-        // Guardar en Firestore
-        const expenseWithUser = {
-          ...expense,
-          userId: user.uid,
-          createdAt: new Date(),
-        }
-
-        const docRef = await addDoc(collection(db, "expenses"), expenseWithUser)
-
-        // Actualizar estado local
-        const newExpense = {
-          ...expenseWithUser,
-          id: docRef.id,
-        } as Expense
-
-        setData((prev) => ({
-          ...prev,
-          expenses: [...prev.expenses, newExpense],
-        }))
-      } else {
-        // Guardar localmente
-        const newExpense = {
-          ...expense,
-          id: Date.now().toString(),
-        }
-
-        setData((prev) => ({
-          ...prev,
-          expenses: [...prev.expenses, newExpense],
-        }))
+      const newExpense = {
+        ...expense,
+        id: Date.now().toString(),
+        createdAt: new Date(),
       }
+
+      if (user) {
+        const transactionsRef = doc(db, "transactions", user.uid)
+        const transactionsDoc = await getDoc(transactionsRef)
+
+        if (transactionsDoc.exists()) {
+          const currentExpenses = transactionsDoc.data().expenses || []
+          await updateDoc(transactionsRef, {
+            expenses: [...currentExpenses, newExpense],
+            updatedAt: new Date()
+          })
+        } else {
+          await setDoc(transactionsRef, {
+            expenses: [newExpense],
+            incomes: [],
+            createdAt: new Date(),
+            updatedAt: new Date()
+          })
+        }
+      }
+
+      setData(prev => ({
+        ...prev,
+        expenses: [...prev.expenses, newExpense],
+      }))
     } catch (error) {
       console.error("Error al añadir gasto:", error)
       throw error
@@ -294,38 +308,36 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const addIncome = async (income: Omit<Income, "id">) => {
     try {
-      if (user) {
-        // Guardar en Firestore
-        const incomeWithUser = {
-          ...income,
-          userId: user.uid,
-          createdAt: new Date(),
-        }
-
-        const docRef = await addDoc(collection(db, "incomes"), incomeWithUser)
-
-        // Actualizar estado local
-        const newIncome = {
-          ...incomeWithUser,
-          id: docRef.id,
-        } as Income
-
-        setData((prev) => ({
-          ...prev,
-          incomes: [...prev.incomes, newIncome],
-        }))
-      } else {
-        // Guardar localmente
-        const newIncome = {
-          ...income,
-          id: Date.now().toString(),
-        }
-
-        setData((prev) => ({
-          ...prev,
-          incomes: [...prev.incomes, newIncome],
-        }))
+      const newIncome = {
+        ...income,
+        id: Date.now().toString(),
+        createdAt: new Date(),
       }
+
+      if (user) {
+        const transactionsRef = doc(db, "transactions", user.uid)
+        const transactionsDoc = await getDoc(transactionsRef)
+
+        if (transactionsDoc.exists()) {
+          const currentIncomes = transactionsDoc.data().incomes || []
+          await updateDoc(transactionsRef, {
+            incomes: [...currentIncomes, newIncome],
+            updatedAt: new Date()
+          })
+        } else {
+          await setDoc(transactionsRef, {
+            expenses: [],
+            incomes: [newIncome],
+            createdAt: new Date(),
+            updatedAt: new Date()
+          })
+        }
+      }
+
+      setData(prev => ({
+        ...prev,
+        incomes: [...prev.incomes, newIncome],
+      }))
     } catch (error) {
       console.error("Error al añadir ingreso:", error)
       throw error
@@ -501,8 +513,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       }
 
       setData(prev => ({
-        ...prev,
-        budgetRules: [...prev.budgetRules, newRule]
+        ...(prev || initialData),
+        budgetRules: [...((prev || initialData).budgetRules || []), newRule]
       }))
     } catch (error) {
       console.error("Error al añadir regla de presupuesto:", error)
@@ -510,7 +522,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const updateBudgetRule = async (id: string, updates: Partial<BudgetRule>) => {
+  const updateBudgetRule = async (updatedRule: BudgetRule) => {
     try {
       if (user) {
         const budgetRulesRef = doc(db, "budgetRules", user.uid)
@@ -519,7 +531,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         if (budgetRulesDoc.exists()) {
           const currentRules = budgetRulesDoc.data().rules || []
           const updatedRules = currentRules.map((rule: BudgetRule) => 
-            rule.id === id ? { ...rule, ...updates } : rule
+            rule.id === updatedRule.id ? updatedRule : rule
           )
           
           await updateDoc(budgetRulesRef, {
@@ -527,12 +539,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             updatedAt: new Date()
           })
         } else {
-          // Si el documento no existe, lo creamos con la regla actualizada
-          const defaultRules = data.budgetRules.map((rule: BudgetRule) =>
-            rule.id === id ? { ...rule, ...updates } : rule
-          )
           await setDoc(budgetRulesRef, {
-            rules: defaultRules,
+            rules: [updatedRule],
             createdAt: new Date(),
             updatedAt: new Date()
           })
@@ -540,9 +548,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       }
 
       setData(prev => ({
-        ...prev,
-        budgetRules: prev.budgetRules.map(rule => 
-          rule.id === id ? { ...rule, ...updates } : rule
+        ...(prev || initialData),
+        budgetRules: ((prev || initialData).budgetRules || []).map((rule: BudgetRule) =>
+          rule.id === updatedRule.id ? updatedRule : rule
         )
       }))
     } catch (error) {
@@ -551,36 +559,46 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const deleteBudgetRule = async (id: string) => {
+  const deleteBudgetRule = async (ruleId: string) => {
     try {
+      // Prevenir la eliminación de la regla por defecto
+      if (ruleId === "50-30-20") {
+        console.error("No se puede eliminar la regla por defecto 50/30/20")
+        return
+      }
+
       if (user) {
         const budgetRulesRef = doc(db, "budgetRules", user.uid)
         const budgetRulesDoc = await getDoc(budgetRulesRef)
         
         if (budgetRulesDoc.exists()) {
           const currentRules = budgetRulesDoc.data().rules || []
-          const updatedRules = currentRules.filter((rule: BudgetRule) => rule.id !== id)
+          const updatedRules = currentRules.filter((rule: BudgetRule) => rule.id !== ruleId)
           
           await updateDoc(budgetRulesRef, {
             rules: updatedRules,
             updatedAt: new Date()
           })
-        } else {
-          // Si el documento no existe, lo creamos con las reglas actuales menos la eliminada
-          const defaultRules = data.budgetRules.filter(rule => rule.id !== id)
-          await setDoc(budgetRulesRef, {
-            rules: defaultRules,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          })
         }
       }
 
-      setData(prev => ({
-        ...prev,
-        budgetRules: prev.budgetRules.filter(rule => rule.id !== id),
-        activeBudgetRuleId: prev.activeBudgetRuleId === id ? "50-30-20" : prev.activeBudgetRuleId
-      }))
+      setData(prev => {
+        const updatedRules = ((prev || initialData).budgetRules || []).filter(
+          (rule: BudgetRule) => rule.id !== ruleId
+        )
+        
+        // Asegurar que la regla 50/30/20 siempre esté presente
+        if (!updatedRules.some(rule => rule.id === "50-30-20")) {
+          updatedRules.unshift(initialData.budgetRules[0])
+        }
+
+        return {
+          ...(prev || initialData),
+          budgetRules: updatedRules,
+          // Si la regla activa es la que se está eliminando, cambiar a la regla por defecto
+          activeBudgetRuleId: prev.activeBudgetRuleId === ruleId ? "50-30-20" : prev.activeBudgetRuleId
+        }
+      })
     } catch (error) {
       console.error("Error al eliminar regla de presupuesto:", error)
       throw error

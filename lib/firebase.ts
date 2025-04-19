@@ -4,15 +4,15 @@ import { getAuth } from "firebase/auth"
 import { getFirestore } from "firebase/firestore"
 import { getAnalytics } from "firebase/analytics"
 
-// Configuración de Firebase
+// Configuración de Firebase usando variables de entorno
 const firebaseConfig = {
-  apiKey: "AIzaSyDnb461RxGx3hJ5SetD4I-rYLdUzgCI5V0",
-  authDomain: "personal-finance-8b983.firebaseapp.com",
-  projectId: "personal-finance-8b983",
-  storageBucket: "personal-finance-8b983.firebasestorage.app",
-  messagingSenderId: "1027877283704",
-  appId: "1:1027877283704:web:5e251aa31827aa6a0a4a8d",
-  measurementId: "G-349F79X300",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 }
 
 // Inicializar Firebase

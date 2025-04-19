@@ -21,6 +21,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 
 interface Category {
   name: string;
@@ -42,11 +43,45 @@ const categoryDescriptions: Record<string, string> = {
 
 export default function BudgetOverview() {
   const { totalIncome, totalExpenses, data, addBudgetRule, updateBudgetRule, deleteBudgetRule, setActiveBudgetRule } = useFinance()
-  const { currency, budgetRules, activeBudgetRuleId } = data
+  const { currency, budgetRules = [], activeBudgetRuleId } = data || {}
   const [showRuleForm, setShowRuleForm] = useState(false)
   const [editingRule, setEditingRule] = useState<BudgetRule | null>(null)
 
-  const activeRule = budgetRules.find((rule: BudgetRule) => rule.id === activeBudgetRuleId) || budgetRules[0]
+  // Regla por defecto
+  const defaultRule: BudgetRule = {
+    id: "50-30-20",
+    name: "Regla 50/30/20",
+    description: "La regla 50/30/20 es un método simple para presupuestar y ahorrar dinero, que divide los ingresos en tres categorías: 50% para necesidades básicas, 30% para deseos y 20% para ahorros.",
+    categories: [
+      { 
+        name: "Necesidades", 
+        percentage: 50, 
+        color: "#0ea5e9",
+        description: "50% de tus ingresos para necesidades básicas como vivienda, alimentación, servicios públicos, transporte y gastos médicos esenciales."
+      },
+      { 
+        name: "Deseos", 
+        percentage: 30, 
+        color: "#8b5cf6",
+        description: "30% para gastos no esenciales como entretenimiento, compras discrecionales, salidas a comer y hobbies."
+      },
+      { 
+        name: "Ahorros", 
+        percentage: 20, 
+        color: "#10b981",
+        description: "20% destinado a ahorros, inversiones, fondo de emergencia y metas financieras a largo plazo."
+      }
+    ],
+    isDefault: true
+  }
+
+  // Asegurarnos de que siempre haya una regla activa
+  const activeRule = budgetRules.find((rule: BudgetRule) => rule.id === activeBudgetRuleId) || 
+                    budgetRules[0] || 
+                    defaultRule
+
+  // Asegurarnos de que budgetRules siempre tenga al menos la regla por defecto
+  const rules = budgetRules.length > 0 ? budgetRules : [defaultRule]
 
   // Calcular valores para cada categoría de la regla activa
   const categoryValues = activeRule.categories.map((category: Category) => {
@@ -128,13 +163,11 @@ export default function BudgetOverview() {
       return
     }
 
-    if (confirm("¿Estás seguro de que deseas eliminar esta regla?")) {
-      deleteBudgetRule(rule.id)
-      toast({
-        title: "Regla eliminada",
-        description: "La regla ha sido eliminada correctamente"
-      })
-    }
+    deleteBudgetRule(rule.id)
+    toast({
+      title: "Regla eliminada",
+      description: "La regla ha sido eliminada correctamente"
+    })
   }
 
   if (totalIncome === 0) {
@@ -170,7 +203,7 @@ export default function BudgetOverview() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {budgetRules.map(rule => (
+            {rules.map(rule => (
               <div
                 key={rule.id}
                 className={`p-3 md:p-4 rounded-lg border ${
@@ -197,13 +230,16 @@ export default function BudgetOverview() {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteRule(rule)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <DeleteConfirmationDialog
+                          title="Eliminar Regla"
+                          description={`¿Estás seguro de que deseas eliminar la regla "${rule.name}"? Esta acción no se puede deshacer.`}
+                          onDelete={() => handleDeleteRule(rule)}
+                          trigger={
+                            <Button variant="ghost" size="icon">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          }
+                        />
                       </>
                     )}
                     {rule.id !== activeBudgetRuleId && (

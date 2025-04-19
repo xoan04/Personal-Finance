@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { LogOut, Settings, User } from "lucide-react"
+import { LogOut } from "lucide-react"
 
 export function UserNav() {
   const { user, logout } = useAuth()
@@ -38,8 +38,9 @@ export function UserNav() {
     )
   }
 
-  // Obtener iniciales del email
+  // Obtener iniciales del email y nombre de usuario
   const initials = user.email ? user.email.split("@")[0].substring(0, 2).toUpperCase() : "US"
+  const username = user.email ? user.email.split("@")[0] : "Usuario"
 
   return (
     <DropdownMenu>
@@ -53,19 +54,10 @@ export function UserNav() {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.email}</p>
-            <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+            <p className="text-sm font-medium leading-none">{username}</p>
+            <p className="text-xs leading-none text-muted-foreground truncate">{user.email}</p>
           </div>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/profile")}>
-          <User className="mr-2 h-4 w-4" />
-          <span>Perfil</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/settings")}>
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Configuración</span>
-        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
