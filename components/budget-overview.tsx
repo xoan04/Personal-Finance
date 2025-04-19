@@ -1,182 +1,412 @@
 "use client"
 
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RechartsTooltip } from "recharts"
 import { useFinance } from "@/context/finance-context"
 import { formatCurrency } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { PlusCircle, Pencil, Trash2, HelpCircle } from "lucide-react"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { toast } from "@/components/ui/use-toast"
+import type { BudgetRule } from "@/lib/types"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+
+interface Category {
+  name: string;
+  percentage: number;
+  color: string;
+}
+
+interface CategoryValue extends Category {
+  target: number;
+  current: number;
+  percent: number;
+}
+
+const categoryDescriptions: Record<string, string> = {
+  "Necesidades": "Este porcentaje se destina a gastos esenciales como vivienda, comida, transporte, servicios públicos, y otros gastos necesarios para la supervivencia.",
+  "Deseos": "Este porcentaje se destina a gastos no esenciales, como entretenimiento, comidas fuera de casa, vacaciones, y otros gastos que mejoran la calidad de vida, pero que no son imprescindibles.",
+  "Ahorros": "Este porcentaje se destina a ahorrar para el futuro, ya sea para metas a largo plazo, como comprar una casa o jubilarse, o para crear un fondo de emergencia."
+}
 
 export default function BudgetOverview() {
-  const { totalIncome, totalExpenses, data } = useFinance()
-  const { currency } = data
+  const { totalIncome, totalExpenses, data, addBudgetRule, updateBudgetRule, deleteBudgetRule, setActiveBudgetRule } = useFinance()
+  const { currency, budgetRules, activeBudgetRuleId } = data
+  const [showRuleForm, setShowRuleForm] = useState(false)
+  const [editingRule, setEditingRule] = useState<BudgetRule | null>(null)
 
-  // Calcular valores para la regla 50/30/20
-  const needsTarget = totalIncome * 0.5
-  const wantsTarget = totalIncome * 0.3
-  const savingsTarget = totalIncome * 0.2
+  const activeRule = budgetRules.find((rule: BudgetRule) => rule.id === activeBudgetRuleId) || budgetRules[0]
 
-  // Valores actuales (estimados)
-  const needsCurrent = totalExpenses * 0.6 // Asumimos que el 60% de los gastos son necesidades
-  const wantsCurrent = totalExpenses * 0.4 // Asumimos que el 40% de los gastos son deseos
-  const savingsCurrent = totalIncome - totalExpenses // Lo que queda son ahorros
+  // Calcular valores para cada categoría de la regla activa
+  const categoryValues = activeRule.categories.map((category: Category) => {
+    const target = totalIncome * (category.percentage / 100)
+    // Por ahora usamos una distribución simple de gastos
+    const current = totalExpenses * (category.percentage / 100)
+    const percent = target > 0 ? Math.min(100, (current / target) * 100) : 0
 
-  // Calcular porcentajes de cumplimiento
-  const needsPercent = needsTarget > 0 ? Math.min(100, (needsCurrent / needsTarget) * 100) : 0
-  const wantsPercent = wantsTarget > 0 ? Math.min(100, (wantsCurrent / wantsTarget) * 100) : 0
-  const savingsPercent = savingsTarget > 0 ? Math.min(100, (savingsCurrent / savingsTarget) * 100) : 0
-
-  // Datos para la regla 50/30/20
-  const budgetData = [
-    { name: "Necesidades (50%)", value: needsTarget, color: "#0ea5e9", current: needsCurrent, percent: needsPercent },
-    { name: "Deseos (30%)", value: wantsTarget, color: "#8b5cf6", current: wantsCurrent, percent: wantsPercent },
-    { name: "Ahorros (20%)", value: savingsTarget, color: "#10b981", current: savingsCurrent, percent: savingsPercent },
-  ]
+    return {
+      ...category,
+      target,
+      current,
+      percent
+    }
+  })
 
   // Datos para el gráfico de pastel
-  const pieData = [
-    { name: "Necesidades", value: needsCurrent, color: "#0ea5e9" },
-    { name: "Deseos", value: wantsCurrent, color: "#8b5cf6" },
-    { name: "Ahorros", value: savingsCurrent, color: "#10b981" },
-  ].filter((item) => item.value > 0)
+  const pieData = categoryValues
+    .map((category: CategoryValue) => ({
+      name: category.name,
+      value: category.current,
+      color: category.color
+    }))
+    .filter((item: { value: number }) => item.value > 0)
+
+  const handleSubmitRule = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    
+    const name = formData.get("name") as string
+    const description = formData.get("description") as string
+    const categories = activeRule.categories.map((cat: Category, index: number) => ({
+      name: formData.get(`category-${index}-name`) as string,
+      percentage: Number(formData.get(`category-${index}-percentage`)),
+      color: formData.get(`category-${index}-color`) as string
+    }))
+
+    const totalPercentage = categories.reduce((sum: number, cat: Category) => sum + cat.percentage, 0)
+    if (totalPercentage !== 100) {
+      toast({
+        title: "Error",
+        description: "Los porcentajes deben sumar 100%",
+        variant: "destructive"
+      })
+      return
+    }
+
+    const ruleData = {
+      name,
+      description,
+      categories
+    }
+
+    if (editingRule) {
+      updateBudgetRule(editingRule.id, ruleData)
+      toast({
+        title: "Regla actualizada",
+        description: "La regla ha sido actualizada correctamente"
+      })
+    } else {
+      addBudgetRule(ruleData)
+      toast({
+        title: "Regla creada",
+        description: "La nueva regla ha sido creada correctamente"
+      })
+    }
+
+    setShowRuleForm(false)
+    setEditingRule(null)
+  }
+
+  const handleDeleteRule = (rule: BudgetRule) => {
+    if (rule.isDefault) {
+      toast({
+        title: "Error",
+        description: "No se puede eliminar la regla predeterminada",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (confirm("¿Estás seguro de que deseas eliminar esta regla?")) {
+      deleteBudgetRule(rule.id)
+      toast({
+        title: "Regla eliminada",
+        description: "La regla ha sido eliminada correctamente"
+      })
+    }
+  }
 
   if (totalIncome === 0) {
     return (
       <div className="text-center py-10">
         <p className="text-muted-foreground">
-          Añade ingresos y gastos para ver tu distribución según la regla 50/30/20
+          Añade ingresos y gastos para ver tu distribución según las reglas de presupuesto
         </p>
       </div>
     )
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Regla 50/30/20</CardTitle>
-          <CardDescription>
-            Distribución recomendada de tus ingresos mensuales de {formatCurrency(totalIncome, currency)}
-          </CardDescription>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+      <Card className="w-full">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0">
+          <div>
+            <CardTitle className="text-xl md:text-2xl">Reglas de Presupuesto</CardTitle>
+            <CardDescription className="text-sm md:text-base">
+              Selecciona o crea tus propias reglas de distribución
+            </CardDescription>
+          </div>
+          <Button 
+            onClick={() => {
+              setEditingRule(null)
+              setShowRuleForm(true)
+            }}
+            className="w-full sm:w-auto"
+          >
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Nueva Regla
+          </Button>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            {budgetData.map((item) => (
-              <div key={item.name} className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="font-medium">{item.name}</span>
-                  <span>
-                    {formatCurrency(item.current, currency)} / {formatCurrency(item.value, currency)}
-                  </span>
+          <div className="space-y-4">
+            {budgetRules.map(rule => (
+              <div
+                key={rule.id}
+                className={`p-3 md:p-4 rounded-lg border ${
+                  rule.id === activeBudgetRuleId ? "border-primary bg-primary/5" : ""
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2 space-y-2 sm:space-y-0">
+                  <div className="w-full sm:w-auto">
+                    <h4 className="font-medium text-base md:text-lg">{rule.name}</h4>
+                    {rule.description && (
+                      <p className="text-xs md:text-sm text-muted-foreground">{rule.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    {!rule.isDefault && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setEditingRule(rule)
+                            setShowRuleForm(true)
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteRule(rule)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                    {rule.id !== activeBudgetRuleId && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setActiveBudgetRule(rule.id)}
+                        className="w-full sm:w-auto"
+                      >
+                        Activar
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <Progress value={item.percent} className="h-2" />
-                <p className="text-sm text-muted-foreground">
-                  {item.percent < 100
-                    ? `Te faltan ${formatCurrency(item.value - item.current, currency)} para alcanzar tu meta`
-                    : "¡Has alcanzado tu meta!"}
-                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {rule.categories.map(category => (
+                    <div
+                      key={category.name}
+                      className="text-center p-2 rounded relative flex flex-row sm:flex-col items-center justify-between sm:justify-center space-x-2 sm:space-x-0"
+                      style={{ backgroundColor: `${category.color}20` }}
+                    >
+                      <div className="flex items-center gap-1">
+                        <div className="text-sm font-medium">{category.name}</div>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-4 w-4 p-0">
+                                <HelpCircle className="h-3 w-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-[200px] text-xs sm:text-sm">
+                                {categoryDescriptions[category.name] || "Categoría personalizada"}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <div className="text-base sm:text-lg font-bold">{category.percentage}%</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="w-full">
         <CardHeader>
-          <CardTitle>Distribución Actual</CardTitle>
-          <CardDescription>Cómo estás distribuyendo realmente tus ingresos</CardDescription>
+          <CardTitle className="text-xl md:text-2xl">Distribución Actual</CardTitle>
+          <CardDescription className="text-sm md:text-base">
+            Basado en la regla {activeRule.name}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="chart">
-            <TabsList className="mb-4">
-              <TabsTrigger value="chart">Gráfico</TabsTrigger>
-              <TabsTrigger value="details">Detalles</TabsTrigger>
-            </TabsList>
+          <div className="space-y-6">
+            <div className="aspect-square w-full max-w-[300px] mx-auto">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius="60%"
+                    outerRadius="80%"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={index} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Legend />
+                  <RechartsTooltip
+                    formatter={(value: number) => formatCurrency(value, currency)}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
 
-            <TabsContent value="chart">
-              {pieData.length === 0 ? (
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                  No hay datos suficientes para mostrar el gráfico
-                </div>
-              ) : (
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={90}
-                        paddingAngle={5}
-                        dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => formatCurrency(Number(value), currency)} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="details">
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <div className="w-4 h-4 rounded-full bg-[#0ea5e9] mr-2"></div>
-                    <span>Necesidades</span>
+            <div className="space-y-4">
+              {categoryValues.map((category) => (
+                <div key={category.name} className="space-y-2">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-1 sm:space-y-0">
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium">{category.name}</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-4 w-4 p-0">
+                              <HelpCircle className="h-3 w-3" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-[200px] text-xs sm:text-sm">
+                              {categoryDescriptions[category.name] || "Categoría personalizada"}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <div className="text-sm text-muted-foreground w-full sm:w-auto text-right">
+                      {formatCurrency(category.current, currency)} / {formatCurrency(category.target, currency)}
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-medium">{formatCurrency(needsCurrent, currency)}</span>
-                    <span className="text-sm text-muted-foreground ml-2">
-                      ({totalExpenses > 0 ? ((needsCurrent / totalExpenses) * 100).toFixed(1) : 0}%)
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <div className="w-4 h-4 rounded-full bg-[#8b5cf6] mr-2"></div>
-                    <span>Deseos</span>
-                  </div>
-                  <div>
-                    <span className="font-medium">{formatCurrency(wantsCurrent, currency)}</span>
-                    <span className="text-sm text-muted-foreground ml-2">
-                      ({totalExpenses > 0 ? ((wantsCurrent / totalExpenses) * 100).toFixed(1) : 0}%)
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <div className="w-4 h-4 rounded-full bg-[#10b981] mr-2"></div>
-                    <span>Ahorros</span>
-                  </div>
-                  <div>
-                    <span className="font-medium">{formatCurrency(savingsCurrent, currency)}</span>
-                    <span className="text-sm text-muted-foreground ml-2">
-                      ({totalIncome > 0 ? ((savingsCurrent / totalIncome) * 100).toFixed(1) : 0}%)
-                    </span>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t mt-4">
-                  <p className="text-sm">
-                    {savingsCurrent < savingsTarget
-                      ? "Según la regla 50/30/20, deberías ajustar tu presupuesto para aumentar tus ahorros."
-                      : "¡Felicidades! Estás cumpliendo con la regla 50/30/20 para tus ahorros."}
+                  <Progress value={category.percent} className="h-2" />
+                  <p className="text-xs text-muted-foreground">
+                    {category.percent >= 100
+                      ? "Has superado el límite para esta categoría"
+                      : `Te falta ${formatCurrency(category.target - category.current, currency)} para alcanzar el objetivo`}
                   </p>
                 </div>
-              </div>
-            </TabsContent>
-          </Tabs>
+              ))}
+            </div>
+          </div>
         </CardContent>
       </Card>
+
+      <Dialog open={showRuleForm} onOpenChange={setShowRuleForm}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl">
+              {editingRule ? "Editar Regla" : "Nueva Regla"}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmitRule} className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nombre</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  defaultValue={editingRule?.name}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Descripción</Label>
+                <Textarea
+                  id="description"
+                  name="description"
+                  defaultValue={editingRule?.description}
+                />
+              </div>
+              <div className="space-y-4">
+                <Label>Categorías</Label>
+                {activeRule.categories.map((category, index) => (
+                  <div key={index} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div>
+                      <Label htmlFor={`category-${index}-name`}>Nombre</Label>
+                      <Input
+                        id={`category-${index}-name`}
+                        name={`category-${index}-name`}
+                        defaultValue={editingRule?.categories[index]?.name ?? category.name}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`category-${index}-percentage`}>Porcentaje</Label>
+                      <Input
+                        id={`category-${index}-percentage`}
+                        name={`category-${index}-percentage`}
+                        type="number"
+                        min="0"
+                        max="100"
+                        defaultValue={editingRule?.categories[index]?.percentage ?? category.percentage}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`category-${index}-color`}>Color</Label>
+                      <Input
+                        id={`category-${index}-color`}
+                        name={`category-${index}-color`}
+                        type="color"
+                        defaultValue={editingRule?.categories[index]?.color ?? category.color}
+                        required
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowRuleForm(false)
+                  setEditingRule(null)
+                }}
+                className="w-full sm:w-auto order-1 sm:order-none"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" className="w-full sm:w-auto">
+                {editingRule ? "Guardar Cambios" : "Crear Regla"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

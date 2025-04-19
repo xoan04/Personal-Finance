@@ -6,6 +6,8 @@ export interface Expense {
   category: string
   date: string
   notes?: string
+  userId?: string
+  createdAt?: Date
 }
 
 export interface Income {
@@ -15,15 +17,19 @@ export interface Income {
   category: string
   date: string
   notes?: string
+  userId?: string
+  createdAt?: Date
 }
 
 export interface Goal {
   id: string
   title: string
-  description: string
+  description?: string
   targetAmount: number
   currentAmount: number
   deadline: string
+  userId?: string
+  createdAt?: Date
 }
 
 export interface FinanceData {
@@ -37,17 +43,27 @@ export interface FinanceData {
     percent: number
     color: string
   }[]
-  currency: {
-    code: string
-    symbol: string
-    name: string
-  }
+  currency: Currency
+  budgetRules: BudgetRule[]
+  activeBudgetRuleId: string
 }
 
 export interface Currency {
   code: string
   symbol: string
   name: string
+}
+
+export interface BudgetRule {
+  id: string
+  name: string
+  description?: string
+  categories: {
+    name: string
+    percentage: number
+    color: string
+  }[]
+  isDefault?: boolean
 }
 
 export const currencies: Currency[] = [

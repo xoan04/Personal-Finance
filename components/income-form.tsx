@@ -60,34 +60,46 @@ export default function IncomeForm({ onClose }: IncomeFormProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-background rounded-lg w-full max-w-md p-6 relative">
-        <Button variant="ghost" size="icon" className="absolute right-4 top-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-background rounded-lg w-full max-w-md p-4 sm:p-6 relative max-h-[90vh] overflow-y-auto">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="absolute right-2 sm:right-4 top-2 sm:top-4" 
+          onClick={onClose}
+        >
           <X className="h-4 w-4" />
         </Button>
 
-        <h2 className="text-xl font-bold mb-4">Añadir Ingreso</h2>
+        <h2 className="text-lg sm:text-xl font-bold mb-4">Añadir Ingreso</h2>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
-            <Label htmlFor="description">Descripción</Label>
+            <Label htmlFor="description" className="text-sm font-medium">
+              Descripción
+            </Label>
             <Input
               id="description"
               placeholder="Ej: Salario"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
+              className="w-full"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Monto</Label>
+            <Label htmlFor="amount" className="text-sm font-medium">
+              Monto
+            </Label>
             <div className="relative">
-              <span className="absolute left-3 top-2.5">{currency.symbol}</span>
+              <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">
+                {currency.symbol}
+              </span>
               <Input
                 id="amount"
                 type="number"
-                className="pl-7"
+                className="pl-7 w-full"
                 placeholder="0.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
@@ -99,12 +111,14 @@ export default function IncomeForm({ onClose }: IncomeFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="category">Categoría</Label>
+            <Label htmlFor="category" className="text-sm font-medium">
+              Categoría
+            </Label>
             <Select value={category} onValueChange={setCategory} required>
-              <SelectTrigger id="category">
+              <SelectTrigger id="category" className="w-full">
                 <SelectValue placeholder="Selecciona una categoría" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[200px]">
                 <SelectItem value="salary">Salario</SelectItem>
                 <SelectItem value="freelance">Trabajo freelance</SelectItem>
                 <SelectItem value="investment">Inversiones</SelectItem>
@@ -115,35 +129,60 @@ export default function IncomeForm({ onClose }: IncomeFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label>Fecha</Label>
+            <Label className="text-sm font-medium">Fecha</Label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal")}>
+                <Button 
+                  variant={"outline"} 
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !date && "text-muted-foreground"
+                  )}
+                >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {date ? format(date, "PPP", { locale: es }) : "Selecciona una fecha"}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={date} onSelect={(date) => date && setDate(date)} initialFocus />
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar 
+                  mode="single" 
+                  selected={date} 
+                  onSelect={(date) => date && setDate(date)} 
+                  initialFocus 
+                  className="rounded-md border"
+                />
               </PopoverContent>
             </Popover>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notas (opcional)</Label>
+            <Label htmlFor="notes" className="text-sm font-medium">
+              Notas (opcional)
+            </Label>
             <Textarea
               id="notes"
               placeholder="Añade detalles adicionales"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              className="w-full min-h-[100px]"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose}
+              className="w-full sm:w-auto"
+            >
               Cancelar
             </Button>
-            <Button type="submit">Guardar</Button>
+            <Button 
+              type="submit"
+              className="w-full sm:w-auto"
+            >
+              Guardar
+            </Button>
           </div>
         </form>
       </div>

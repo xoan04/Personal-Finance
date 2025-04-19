@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import type { Currency, Expense, FinanceData, Goal, Income } from "@/lib/types"
+import type { Currency, Expense, FinanceData, Goal, Income, BudgetRule } from "@/lib/types"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/context/auth-context"
 import {
@@ -27,6 +27,20 @@ const initialData: FinanceData = {
   monthlyExpenses: {},
   categoryBreakdown: [],
   currency: { code: "USD", symbol: "$", name: "Dólar estadounidense" },
+  budgetRules: [
+    {
+      id: "50-30-20",
+      name: "Regla 50/30/20",
+      description: "Distribución clásica para un presupuesto balanceado",
+      categories: [
+        { name: "Necesidades", percentage: 50, color: "#0ea5e9" },
+        { name: "Deseos", percentage: 30, color: "#8b5cf6" },
+        { name: "Ahorros", percentage: 20, color: "#10b981" }
+      ],
+      isDefault: true
+    }
+  ],
+  activeBudgetRuleId: "50-30-20"
 }
 
 // Crear el contexto
@@ -43,6 +57,10 @@ type FinanceContextType = {
   totalExpenses: number
   balance: number
   loading: boolean
+  addBudgetRule: (rule: Omit<BudgetRule, "id">) => void
+  updateBudgetRule: (id: string, updates: Partial<BudgetRule>) => void
+  deleteBudgetRule: (id: string) => void
+  setActiveBudgetRule: (id: string) => void
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined)
@@ -76,9 +94,21 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const userDocRef = doc(db, "users", user.uid)
         const userDoc = await getDoc(userDocRef)
 
+        // Cargar reglas de presupuesto del usuario
+        const budgetRulesDoc = await getDoc(doc(db, "budgetRules", user.uid))
+        const customBudgetRules = budgetRulesDoc.exists() 
+          ? (budgetRulesDoc.data().rules as BudgetRule[]) 
+          : []
+
+        // Cargar metas del usuario
+        const goalsDoc = await getDoc(doc(db, "goals", user.uid))
+        const userGoals = goalsDoc.exists()
+          ? (goalsDoc.data().goals as Goal[])
+          : []
+
         if (userDoc.exists()) {
           // Cargar datos básicos del usuario
-          const userData = userDoc.data() as { currency: Currency }
+          const userData = userDoc.data() as { currency: Currency; activeBudgetRuleId: string }
 
           // Cargar gastos
           const expensesQuery = query(collection(db, "expenses"), where("userId", "==", user.uid))
@@ -96,27 +126,34 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             ...doc.data(),
           })) as Income[]
 
-          // Cargar metas
-          const goalsQuery = query(collection(db, "goals"), where("userId", "==", user.uid))
-          const goalsSnapshot = await getDocs(goalsQuery)
-          const goals = goalsSnapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as Goal[]
-
           setData({
             ...initialData,
             expenses,
             incomes,
-            goals,
+            goals: userGoals,
             currency: userData.currency || initialData.currency,
+            budgetRules: [...initialData.budgetRules, ...customBudgetRules],
+            activeBudgetRuleId: userData.activeBudgetRuleId || initialData.activeBudgetRuleId,
           })
         } else {
-          // Si el usuario es nuevo, crear su documento
-          await setDoc(userDocRef, {
-            currency: initialData.currency,
-            createdAt: new Date(),
-          })
+          // Si el usuario es nuevo, crear sus documentos
+          await Promise.all([
+            setDoc(userDocRef, {
+              currency: initialData.currency,
+              activeBudgetRuleId: initialData.activeBudgetRuleId,
+              createdAt: new Date(),
+            }),
+            setDoc(doc(db, "budgetRules", user.uid), {
+              rules: [],
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }),
+            setDoc(doc(db, "goals", user.uid), {
+              goals: [],
+              createdAt: new Date(),
+              updatedAt: new Date()
+            })
+          ])
           setData(initialData)
         }
       } catch (error) {
@@ -297,56 +334,68 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const addGoal = async (goal: Omit<Goal, "id">) => {
     try {
-      if (user) {
-        // Guardar en Firestore
-        const goalWithUser = {
-          ...goal,
-          userId: user.uid,
-          createdAt: new Date(),
-        }
-
-        const docRef = await addDoc(collection(db, "goals"), goalWithUser)
-
-        // Actualizar estado local
-        const newGoal = {
-          ...goalWithUser,
-          id: docRef.id,
-        } as Goal
-
-        setData((prev) => ({
-          ...prev,
-          goals: [...prev.goals, newGoal],
-        }))
-      } else {
-        // Guardar localmente
-        const newGoal = {
-          ...goal,
-          id: Date.now().toString(),
-        }
-
-        setData((prev) => ({
-          ...prev,
-          goals: [...prev.goals, newGoal],
-        }))
+      const newGoal = {
+        ...goal,
+        id: Date.now().toString(),
       }
+
+      if (user) {
+        const goalsRef = doc(db, "goals", user.uid)
+        const goalsDoc = await getDoc(goalsRef)
+
+        if (goalsDoc.exists()) {
+          const currentGoals = goalsDoc.data().goals || []
+          await updateDoc(goalsRef, {
+            goals: [...currentGoals, newGoal],
+            updatedAt: new Date()
+          })
+        } else {
+          await setDoc(goalsRef, {
+            goals: [newGoal],
+            createdAt: new Date(),
+            updatedAt: new Date()
+          })
+        }
+      }
+
+      setData(prev => ({
+        ...prev,
+        goals: [...prev.goals, newGoal],
+      }))
     } catch (error) {
       console.error("Error al añadir meta:", error)
       throw error
     }
   }
 
-  const updateGoal = async (goal: Goal) => {
+  const updateGoal = async (goalToUpdate: Goal) => {
     try {
       if (user) {
-        // Actualizar en Firestore
-        const goalRef = doc(db, "goals", goal.id)
-        await updateDoc(goalRef, { ...goal })
+        const goalsRef = doc(db, "goals", user.uid)
+        const goalsDoc = await getDoc(goalsRef)
+
+        if (goalsDoc.exists()) {
+          const currentGoals = goalsDoc.data().goals || []
+          const updatedGoals = currentGoals.map((goal: Goal) =>
+            goal.id === goalToUpdate.id ? goalToUpdate : goal
+          )
+
+          await updateDoc(goalsRef, {
+            goals: updatedGoals,
+            updatedAt: new Date()
+          })
+        } else {
+          await setDoc(goalsRef, {
+            goals: [goalToUpdate],
+            createdAt: new Date(),
+            updatedAt: new Date()
+          })
+        }
       }
 
-      // Actualizar estado local
-      setData((prev) => ({
+      setData(prev => ({
         ...prev,
-        goals: prev.goals.map((g) => (g.id === goal.id ? goal : g)),
+        goals: prev.goals.map(g => g.id === goalToUpdate.id ? goalToUpdate : g),
       }))
     } catch (error) {
       console.error("Error al actualizar meta:", error)
@@ -357,15 +406,29 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const deleteGoal = async (id: string) => {
     try {
       if (user) {
-        // Eliminar de Firestore
-        const goalRef = doc(db, "goals", id)
-        await deleteDoc(goalRef)
+        const goalsRef = doc(db, "goals", user.uid)
+        const goalsDoc = await getDoc(goalsRef)
+
+        if (goalsDoc.exists()) {
+          const currentGoals = goalsDoc.data().goals || []
+          const updatedGoals = currentGoals.filter((goal: Goal) => goal.id !== id)
+
+          await updateDoc(goalsRef, {
+            goals: updatedGoals,
+            updatedAt: new Date()
+          })
+        } else {
+          await setDoc(goalsRef, {
+            goals: [],
+            createdAt: new Date(),
+            updatedAt: new Date()
+          })
+        }
       }
 
-      // Actualizar estado local
-      setData((prev) => ({
+      setData(prev => ({
         ...prev,
-        goals: prev.goals.filter((g) => g.id !== id),
+        goals: prev.goals.filter(g => g.id !== id),
       }))
     } catch (error) {
       console.error("Error al eliminar meta:", error)
@@ -409,6 +472,139 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const addBudgetRule = async (rule: Omit<BudgetRule, "id">) => {
+    try {
+      const newRule = {
+        ...rule,
+        id: Date.now().toString(),
+      }
+
+      if (user) {
+        // Obtener reglas actuales
+        const budgetRulesRef = doc(db, "budgetRules", user.uid)
+        const budgetRulesDoc = await getDoc(budgetRulesRef)
+        
+        if (budgetRulesDoc.exists()) {
+          const currentRules = budgetRulesDoc.data().rules || []
+          await updateDoc(budgetRulesRef, {
+            rules: [...currentRules, newRule],
+            updatedAt: new Date()
+          })
+        } else {
+          // Si el documento no existe, lo creamos
+          await setDoc(budgetRulesRef, {
+            rules: [newRule],
+            createdAt: new Date(),
+            updatedAt: new Date()
+          })
+        }
+      }
+
+      setData(prev => ({
+        ...prev,
+        budgetRules: [...prev.budgetRules, newRule]
+      }))
+    } catch (error) {
+      console.error("Error al añadir regla de presupuesto:", error)
+      throw error
+    }
+  }
+
+  const updateBudgetRule = async (id: string, updates: Partial<BudgetRule>) => {
+    try {
+      if (user) {
+        const budgetRulesRef = doc(db, "budgetRules", user.uid)
+        const budgetRulesDoc = await getDoc(budgetRulesRef)
+        
+        if (budgetRulesDoc.exists()) {
+          const currentRules = budgetRulesDoc.data().rules || []
+          const updatedRules = currentRules.map((rule: BudgetRule) => 
+            rule.id === id ? { ...rule, ...updates } : rule
+          )
+          
+          await updateDoc(budgetRulesRef, {
+            rules: updatedRules,
+            updatedAt: new Date()
+          })
+        } else {
+          // Si el documento no existe, lo creamos con la regla actualizada
+          const defaultRules = data.budgetRules.map((rule: BudgetRule) =>
+            rule.id === id ? { ...rule, ...updates } : rule
+          )
+          await setDoc(budgetRulesRef, {
+            rules: defaultRules,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          })
+        }
+      }
+
+      setData(prev => ({
+        ...prev,
+        budgetRules: prev.budgetRules.map(rule => 
+          rule.id === id ? { ...rule, ...updates } : rule
+        )
+      }))
+    } catch (error) {
+      console.error("Error al actualizar regla de presupuesto:", error)
+      throw error
+    }
+  }
+
+  const deleteBudgetRule = async (id: string) => {
+    try {
+      if (user) {
+        const budgetRulesRef = doc(db, "budgetRules", user.uid)
+        const budgetRulesDoc = await getDoc(budgetRulesRef)
+        
+        if (budgetRulesDoc.exists()) {
+          const currentRules = budgetRulesDoc.data().rules || []
+          const updatedRules = currentRules.filter((rule: BudgetRule) => rule.id !== id)
+          
+          await updateDoc(budgetRulesRef, {
+            rules: updatedRules,
+            updatedAt: new Date()
+          })
+        } else {
+          // Si el documento no existe, lo creamos con las reglas actuales menos la eliminada
+          const defaultRules = data.budgetRules.filter(rule => rule.id !== id)
+          await setDoc(budgetRulesRef, {
+            rules: defaultRules,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          })
+        }
+      }
+
+      setData(prev => ({
+        ...prev,
+        budgetRules: prev.budgetRules.filter(rule => rule.id !== id),
+        activeBudgetRuleId: prev.activeBudgetRuleId === id ? "50-30-20" : prev.activeBudgetRuleId
+      }))
+    } catch (error) {
+      console.error("Error al eliminar regla de presupuesto:", error)
+      throw error
+    }
+  }
+
+  const setActiveBudgetRule = async (id: string) => {
+    try {
+      if (user) {
+        // Actualizar en Firestore
+        const userDocRef = doc(db, "users", user.uid)
+        await updateDoc(userDocRef, { activeBudgetRuleId: id })
+      }
+
+      setData(prev => ({
+        ...prev,
+        activeBudgetRuleId: id
+      }))
+    } catch (error) {
+      console.error("Error al cambiar regla de presupuesto activa:", error)
+      throw error
+    }
+  }
+
   return (
     <FinanceContext.Provider
       value={{
@@ -424,6 +620,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         totalExpenses,
         balance,
         loading,
+        addBudgetRule,
+        updateBudgetRule,
+        deleteBudgetRule,
+        setActiveBudgetRule
       }}
     >
       {children}

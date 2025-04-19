@@ -123,53 +123,62 @@ export default function FutureGoals() {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Mis Metas Financieras</h2>
-        <Button onClick={() => setShowForm(!showForm)}>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
+        <h2 className="text-xl sm:text-2xl font-bold">Mis Metas Financieras</h2>
+        <Button 
+          onClick={() => setShowForm(!showForm)}
+          className="w-full sm:w-auto"
+        >
           <PlusCircle className="h-4 w-4 mr-2" />
           Nueva Meta
         </Button>
       </div>
 
       {showForm && (
-        <Card className="mb-6">
+        <Card className="w-full">
           <CardHeader>
-            <CardTitle>{editingGoalId ? "Editar Meta" : "Crear Nueva Meta"}</CardTitle>
-            <CardDescription>Define una nueva meta financiera para tu futuro</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">
+              {editingGoalId ? "Editar Meta" : "Crear Nueva Meta"}
+            </CardTitle>
+            <CardDescription className="text-sm">
+              Define una nueva meta financiera para tu futuro
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-2">
-                <Label htmlFor="title">Título</Label>
+                <Label htmlFor="title" className="text-sm font-medium">Título</Label>
                 <Input
                   id="title"
                   placeholder="Ej: Comprar una casa"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   required
+                  className="w-full"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Descripción</Label>
+                <Label htmlFor="description" className="text-sm font-medium">Descripción</Label>
                 <Textarea
                   id="description"
                   placeholder="Describe tu meta"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  className="w-full min-h-[100px]"
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="targetAmount">Monto objetivo</Label>
+                  <Label htmlFor="targetAmount" className="text-sm font-medium">Monto objetivo</Label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5">{currency.symbol}</span>
+                    <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">{currency.symbol}</span>
                     <Input
                       id="targetAmount"
                       type="number"
-                      className="pl-7"
+                      className="pl-7 w-full"
                       placeholder="0.00"
                       value={targetAmount}
                       onChange={(e) => setTargetAmount(e.target.value)}
@@ -181,13 +190,13 @@ export default function FutureGoals() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="currentAmount">Monto actual</Label>
+                  <Label htmlFor="currentAmount" className="text-sm font-medium">Monto actual</Label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5">{currency.symbol}</span>
+                    <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">{currency.symbol}</span>
                     <Input
                       id="currentAmount"
                       type="number"
-                      className="pl-7"
+                      className="pl-7 w-full"
                       placeholder="0.00"
                       value={currentAmount}
                       onChange={(e) => setCurrentAmount(e.target.value)}
@@ -199,21 +208,32 @@ export default function FutureGoals() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="deadline">Fecha límite</Label>
+                <Label htmlFor="deadline" className="text-sm font-medium">Fecha límite</Label>
                 <Input
                   id="deadline"
                   placeholder="Ej: Diciembre 2025"
                   value={deadline}
                   onChange={(e) => setDeadline(e.target.value)}
                   required
+                  className="w-full"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={resetForm}>
+              <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={resetForm}
+                  className="w-full sm:w-auto order-2 sm:order-1"
+                >
                   Cancelar
                 </Button>
-                <Button type="submit">Guardar</Button>
+                <Button 
+                  type="submit"
+                  className="w-full sm:w-auto order-1 sm:order-2"
+                >
+                  Guardar
+                </Button>
               </div>
             </form>
           </CardContent>
@@ -222,16 +242,18 @@ export default function FutureGoals() {
 
       {data.goals.length === 0 ? (
         <div className="text-center py-10">
-          <p className="text-muted-foreground">No tienes metas financieras. ¡Crea una ahora!</p>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            No tienes metas financieras. ¡Crea una ahora!
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           {data.goals.map((goal) => (
-            <Card key={goal.id}>
+            <Card key={goal.id} className="w-full">
               <CardHeader>
-                <div className="flex justify-between">
-                  <CardTitle>{goal.title}</CardTitle>
-                  <div className="flex gap-1">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                  <CardTitle className="text-lg sm:text-xl">{goal.title}</CardTitle>
+                  <div className="flex gap-1 w-full sm:w-auto justify-end">
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(goal)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -240,33 +262,34 @@ export default function FutureGoals() {
                     </Button>
                   </div>
                 </div>
-                <CardDescription>{goal.description}</CardDescription>
+                <CardDescription className="text-sm">{goal.description}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <span>Progreso:</span>
-                    <span>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0">
+                    <span className="text-sm font-medium">Progreso:</span>
+                    <span className="text-sm text-muted-foreground">
                       {formatCurrency(goal.currentAmount, currency)} / {formatCurrency(goal.targetAmount, currency)}
                     </span>
                   </div>
-                  <Progress value={(goal.currentAmount / goal.targetAmount) * 100} className="h-2" />
-                  <div className="flex justify-between text-sm">
-                    <span>{((goal.currentAmount / goal.targetAmount) * 100).toFixed(1)}% completado</span>
-                    <span>Fecha límite: {goal.deadline}</span>
-                  </div>
-
-                  <div className="pt-2">
+                  <Progress 
+                    value={(goal.currentAmount / goal.targetAmount) * 100} 
+                    className="h-2"
+                  />
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Fecha límite: {goal.deadline}
+                    </span>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full"
+                      className="w-full sm:w-auto"
                       onClick={() => {
                         setSelectedGoalId(goal.id)
                         setShowAddFundsDialog(true)
                       }}
                     >
-                      Añadir fondos
+                      Añadir Fondos
                     </Button>
                   </div>
                 </div>
@@ -277,19 +300,21 @@ export default function FutureGoals() {
       )}
 
       <Dialog open={showAddFundsDialog} onOpenChange={setShowAddFundsDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Añadir fondos a tu meta</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">Añadir Fondos</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="funds">Monto a añadir</Label>
+              <Label htmlFor="funds" className="text-sm font-medium">Monto a añadir</Label>
               <div className="relative">
-                <span className="absolute left-3 top-2.5">{currency.symbol}</span>
+                <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">
+                  {currency.symbol}
+                </span>
                 <Input
                   id="funds"
                   type="number"
-                  className="pl-7"
+                  className="pl-7 w-full"
                   placeholder="0.00"
                   value={fundsToAdd}
                   onChange={(e) => setFundsToAdd(e.target.value)}
@@ -299,11 +324,24 @@ export default function FutureGoals() {
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddFundsDialog(false)}>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAddFundsDialog(false)
+                setFundsToAdd("")
+                setSelectedGoalId(null)
+              }}
+              className="w-full sm:w-auto order-2 sm:order-1"
+            >
               Cancelar
             </Button>
-            <Button onClick={handleAddFunds}>Añadir</Button>
+            <Button
+              onClick={handleAddFunds}
+              className="w-full sm:w-auto order-1 sm:order-2"
+            >
+              Añadir
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

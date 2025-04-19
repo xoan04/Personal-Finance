@@ -12,30 +12,59 @@ export default function ExpenseChart() {
 
   if (chartData.length === 0) {
     return (
-      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-        No hay datos de gastos para mostrar
+      <div className="h-[250px] sm:h-[300px] flex items-center justify-center">
+        <p className="text-sm sm:text-base text-muted-foreground text-center px-4">
+          No hay datos de gastos para mostrar
+        </p>
       </div>
     )
   }
 
   return (
-    <div className="h-[300px]">
+    <div className="h-[250px] sm:h-[300px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={chartData}
           margin={{
             top: 5,
-            right: 30,
-            left: 20,
+            right: 20,
+            left: 0,
             bottom: 5,
           }}
         >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" />
-          <YAxis />
-          <Tooltip formatter={(value) => formatCurrency(Number(value), currency)} />
-          <Legend />
-          <Bar dataKey="gastos" fill="#8b5cf6" name="Gastos Mensuales" />
+          <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
+          <XAxis 
+            dataKey="name" 
+            tick={{ fontSize: 12 }}
+            tickMargin={8}
+          />
+          <YAxis 
+            tick={{ fontSize: 12 }}
+            tickFormatter={(value) => formatCurrency(Number(value), currency)}
+            width={80}
+          />
+          <Tooltip 
+            formatter={(value) => formatCurrency(Number(value), currency)}
+            contentStyle={{
+              backgroundColor: "hsl(var(--background))",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: "6px",
+              fontSize: "12px"
+            }}
+            cursor={{ fill: "hsl(var(--muted))" }}
+          />
+          <Legend 
+            wrapperStyle={{
+              fontSize: "12px",
+              marginTop: "8px"
+            }}
+          />
+          <Bar 
+            dataKey="gastos" 
+            fill="hsl(var(--primary))" 
+            name="Gastos Mensuales"
+            radius={[4, 4, 0, 0]}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>
