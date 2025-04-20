@@ -33,21 +33,21 @@ const initialData: FinanceData = {
       name: "Regla 50/30/20",
       description: "La regla 50/30/20 es un método simple para presupuestar y ahorrar dinero, que divide los ingresos en tres categorías: 50% para necesidades básicas, 30% para deseos y 20% para ahorros.",
       categories: [
-        { 
-          name: "Necesidades", 
-          percentage: 50, 
+        {
+          name: "Necesidades",
+          percentage: 50,
           color: "#0ea5e9",
           description: "50% de tus ingresos para necesidades básicas como vivienda, alimentación, servicios públicos, transporte y gastos médicos esenciales."
         },
-        { 
-          name: "Deseos", 
-          percentage: 30, 
+        {
+          name: "Deseos",
+          percentage: 30,
           color: "#8b5cf6",
           description: "30% para gastos no esenciales como entretenimiento, compras discrecionales, salidas a comer y hobbies."
         },
-        { 
-          name: "Ahorros", 
-          percentage: 20, 
+        {
+          name: "Ahorros",
+          percentage: 20,
           color: "#10b981",
           description: "20% destinado a ahorros, inversiones, fondo de emergencia y metas financieras a largo plazo."
         }
@@ -120,8 +120,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
         // Cargar reglas de presupuesto del usuario
         const budgetRulesDoc = await getDoc(doc(db, "budgetRules", user.uid))
-        const customBudgetRules = budgetRulesDoc.exists() 
-          ? (budgetRulesDoc.data().rules as BudgetRule[]) 
+        const customBudgetRules = budgetRulesDoc.exists()
+          ? (budgetRulesDoc.data().rules as BudgetRule[])
           : []
 
         // Cargar metas del usuario
@@ -251,14 +251,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     for (let i = 5; i >= 0; i--) {
       const month = new Date(today.getFullYear(), today.getMonth() - i, 1)
-      const monthKey = monthNames[month.getMonth()]
+      const monthKey = `${monthNames[month.getMonth()]} ${month.getFullYear()}`
       monthlyData[monthKey] = 0
     }
 
     // Sumar gastos por mes
     data.expenses.forEach((expense) => {
       const date = new Date(expense.date)
-      const monthKey = monthNames[date.getMonth()]
+      const monthKey = `${monthNames[date.getMonth()]} ${date.getFullYear()}`
       if (monthlyData[monthKey] !== undefined) {
         monthlyData[monthKey] += expense.amount
       }
@@ -312,6 +312,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const updateExpense = async (expenseToUpdate: Expense) => {
     try {
+      // Buscar el gasto original
+      const originalExpense = data.expenses.find(e => e.id === expenseToUpdate.id)
+
       if (user) {
         const transactionsRef = doc(db, "transactions", user.uid)
         const transactionsDoc = await getDoc(transactionsRef)
@@ -329,9 +332,26 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // Si el gasto está relacionado con una meta y ha cambiado el monto
+      if (originalExpense?.category === "ahorro" && originalExpense?.notes?.includes("Fondos para meta:")) {
+        const goalTitle = originalExpense.notes.split("Fondos para meta:")[1].trim()
+        const goal = data.goals.find(g => g.title === goalTitle)
+        
+        if (goal) {
+          // Si se cambió la categoría o se cambió el monto
+          if (expenseToUpdate.category !== "ahorro" || expenseToUpdate.amount !== originalExpense.amount) {
+            const updatedGoal = {
+              ...goal,
+              currentAmount: goal.currentAmount - originalExpense.amount + (expenseToUpdate.category === "ahorro" ? expenseToUpdate.amount : 0)
+            }
+            await updateGoal(updatedGoal)
+          }
+        }
+      }
+
       setData(prev => ({
         ...prev,
-        expenses: prev.expenses.map(expense => 
+        expenses: prev.expenses.map(expense =>
           expense.id === expenseToUpdate.id ? expenseToUpdate : expense
         ),
       }))
@@ -343,6 +363,27 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const deleteExpense = async (id: string) => {
     try {
+      // Buscar el gasto antes de eliminarlo
+      const expenseToDelete = data.expenses.find(e => e.id === id)
+
+      if (!expenseToDelete) return
+
+      // Si el gasto estaba relacionado con una meta, actualizar la meta primero
+      if (expenseToDelete.category === "ahorro" && expenseToDelete.notes?.includes("Fondos para meta:")) {
+        const goalTitle = expenseToDelete.notes.split("Fondos para meta:")[1].trim()
+        const goal = data.goals.find(g => g.title === goalTitle)
+        
+        if (goal) {
+          const updatedGoal = {
+            ...goal,
+            currentAmount: Math.max(0, goal.currentAmount - expenseToDelete.amount) // Asegurar que no sea negativo
+          }
+          // Actualizar la meta primero
+          await updateGoal(updatedGoal)
+        }
+      }
+
+      // Luego actualizar Firestore
       if (user) {
         const transactionsRef = doc(db, "transactions", user.uid)
         const transactionsDoc = await getDoc(transactionsRef)
@@ -358,10 +399,12 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // Finalmente actualizar el estado local
       setData(prev => ({
         ...prev,
         expenses: prev.expenses.filter(expense => expense.id !== id),
       }))
+
     } catch (error) {
       console.error("Error al eliminar gasto:", error)
       throw error
@@ -427,7 +470,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
       setData(prev => ({
         ...prev,
-        incomes: prev.incomes.map(income => 
+        incomes: prev.incomes.map(income =>
           income.id === incomeToUpdate.id ? incomeToUpdate : income
         ),
       }))
@@ -578,7 +621,21 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         currentAmount: goalToUpdate.currentAmount + amount,
       }
 
-      await updateGoal(updatedGoal)
+      // Crear un gasto correspondiente a los fondos añadidos
+      const expenseData = {
+        description: `Fondos para meta: ${goalToUpdate.title}`,
+        amount: amount,
+        date: new Date().toISOString(),
+        category: "ahorro",
+        notes: `Fondos para meta: ${goalToUpdate.title}`, // Formato consistente para identificar la meta
+      }
+
+      // Actualizar la meta y añadir el gasto
+      await Promise.all([
+        updateGoal(updatedGoal),
+        addExpense(expenseData)
+      ])
+
     } catch (error) {
       console.error("Error al añadir fondos a la meta:", error)
       throw error
@@ -606,16 +663,18 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const addBudgetRule = async (rule: Omit<BudgetRule, "id">) => {
     try {
-      const newRule = {
+      const newRule: BudgetRule = {
         ...rule,
         id: Date.now().toString(),
+        isDefault: rule.isDefault ?? false, // 👈 Asegura que no quede undefined
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
-
+  
       if (user) {
-        // Obtener reglas actuales
         const budgetRulesRef = doc(db, "budgetRules", user.uid)
         const budgetRulesDoc = await getDoc(budgetRulesRef)
-        
+  
         if (budgetRulesDoc.exists()) {
           const currentRules = budgetRulesDoc.data().rules || []
           await updateDoc(budgetRulesRef, {
@@ -623,7 +682,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             updatedAt: new Date()
           })
         } else {
-          // Si el documento no existe, lo creamos
           await setDoc(budgetRulesRef, {
             rules: [newRule],
             createdAt: new Date(),
@@ -631,7 +689,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           })
         }
       }
-
+  
       setData(prev => ({
         ...(prev || initialData),
         budgetRules: [...((prev || initialData).budgetRules || []), newRule]
@@ -641,24 +699,42 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       throw error
     }
   }
+  
 
   const updateBudgetRule = async (updatedRule: BudgetRule) => {
     try {
       if (user) {
         const budgetRulesRef = doc(db, "budgetRules", user.uid)
         const budgetRulesDoc = await getDoc(budgetRulesRef)
-        
+  
+        console.log("📤 Regla recibida para actualizar:", updatedRule)
+  
         if (budgetRulesDoc.exists()) {
           const currentRules = budgetRulesDoc.data().rules || []
-          const updatedRules = currentRules.map((rule: BudgetRule) => 
+  
+          console.log("📥 Reglas actuales:", currentRules)
+  
+          const updatedRules = currentRules.map((rule: BudgetRule) =>
             rule.id === updatedRule.id ? updatedRule : rule
           )
-          
+  
+          console.log("🔁 Reglas después del update:", updatedRules)
+  
+          const hasInvalid = updatedRules.some((rule: BudgetRule) =>
+            rule === undefined || Object.values(rule).some((v) => v === undefined)
+          )
+  
+          if (hasInvalid) {
+            console.error("❌ Reglas inválidas detectadas en update:", updatedRules)
+            throw new Error("No se puede actualizar con reglas inválidas")
+          }
+  
           await updateDoc(budgetRulesRef, {
             rules: updatedRules,
             updatedAt: new Date()
           })
         } else {
+          console.log("📄 Documento no existe, creando uno nuevo con la regla")
           await setDoc(budgetRulesRef, {
             rules: [updatedRule],
             createdAt: new Date(),
@@ -666,18 +742,20 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           })
         }
       }
-
+  
       setData(prev => ({
         ...(prev || initialData),
         budgetRules: ((prev || initialData).budgetRules || []).map((rule: BudgetRule) =>
-          rule.id === updatedRule.id ? updatedRule : rule
+          rule.id === updatedRule.id ? { ...updatedRule, updatedAt: new Date() } : rule
         )
       }))
     } catch (error) {
-      console.error("Error al actualizar regla de presupuesto:", error)
+      console.error("🚨 Error al actualizar regla de presupuesto:", error)
       throw error
     }
   }
+  
+
 
   const deleteBudgetRule = async (ruleId: string) => {
     try {
@@ -690,11 +768,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       if (user) {
         const budgetRulesRef = doc(db, "budgetRules", user.uid)
         const budgetRulesDoc = await getDoc(budgetRulesRef)
-        
+
         if (budgetRulesDoc.exists()) {
           const currentRules = budgetRulesDoc.data().rules || []
           const updatedRules = currentRules.filter((rule: BudgetRule) => rule.id !== ruleId)
-          
+
           await updateDoc(budgetRulesRef, {
             rules: updatedRules,
             updatedAt: new Date()
@@ -706,7 +784,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const updatedRules = ((prev || initialData).budgetRules || []).filter(
           (rule: BudgetRule) => rule.id !== ruleId
         )
-        
+
         // Asegurar que la regla 50/30/20 siempre esté presente
         if (!updatedRules.some(rule => rule.id === "50-30-20")) {
           updatedRules.unshift(initialData.budgetRules[0])

@@ -34,7 +34,8 @@ export interface ExpenseFormProps {
 }
 
 export function ExpenseForm({ onClose, editingExpense }: ExpenseFormProps) {
-  const { addExpense, updateExpense } = useFinance()
+  const { addExpense, updateExpense, data } = useFinance()
+  const { currency } = data
   const [date, setDate] = useState(
     editingExpense?.date 
       ? new Date(editingExpense.date).toISOString().split("T")[0]
@@ -129,13 +130,19 @@ export function ExpenseForm({ onClose, editingExpense }: ExpenseFormProps) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="amount">Monto</Label>
-            <Input
-              id="amount"
-              type="text"
-              value={formattedAmount}
-              onChange={handleAmountChange}
-              placeholder="0"
-            />
+            <div className="relative">
+              <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">
+                {currency.symbol}
+              </span>
+              <Input
+                id="amount"
+                type="text"
+                value={formattedAmount}
+                onChange={handleAmountChange}
+                placeholder="0"
+                className="pl-7 w-full"
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="date">Fecha</Label>
@@ -158,6 +165,7 @@ export function ExpenseForm({ onClose, editingExpense }: ExpenseFormProps) {
                 <SelectItem value="servicios">Servicios</SelectItem>
                 <SelectItem value="entretenimiento">Entretenimiento</SelectItem>
                 <SelectItem value="salud">Salud</SelectItem>
+                <SelectItem value="ahorro">Ahorro</SelectItem>
                 <SelectItem value="otros">Otros</SelectItem>
               </SelectContent>
             </Select>

@@ -65,6 +65,8 @@ export interface BudgetRule {
     description?: string
   }[]
   isDefault?: boolean
+  createdAt?: Date
+  updatedAt?: Date
 }
 
 export const currencies: Currency[] = [

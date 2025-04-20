@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, Loader2, Pencil, Trash2 } from "lucide-react"
+import { PlusCircle, Loader2, Pencil, Trash2, Eye } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import type { Expense, Income } from "@/lib/types"
 import BudgetOverview from "@/components/budget-overview"
@@ -20,6 +20,7 @@ import { UserNav } from "@/components/user-nav"
 import { useAuth } from "@/context/auth-context"
 import ProtectedRoute from "@/components/protected-route"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 export default function Home() {
   const [showExpenseForm, setShowExpenseForm] = useState(false)
@@ -51,7 +52,7 @@ export default function Home() {
                 <CardDescription className="text-xs sm:text-sm">Total de ingresos este mes</CardDescription>
               </CardHeader>
               <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-                <div className="text-lg sm:text-2xl font-bold">{formatCurrency(totalIncome, data.currency)}</div>
+                <div className="text-lg sm:text-2xl font-bold text-green-600">{formatCurrency(totalIncome, data.currency)}</div>
                 <Button variant="ghost" className="mt-1 text-xs sm:text-sm h-7 px-2 sm:h-10 sm:px-4" onClick={() => setShowIncomeForm(true)}>
                   <PlusCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   Añadir ingreso
@@ -65,7 +66,7 @@ export default function Home() {
                 <CardDescription className="text-xs sm:text-sm">Total de gastos este mes</CardDescription>
               </CardHeader>
               <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-                <div className="text-lg sm:text-2xl font-bold">{formatCurrency(totalExpenses, data.currency)}</div>
+                <div className="text-lg sm:text-2xl font-bold text-red-600">{formatCurrency(totalExpenses, data.currency)}</div>
                 <Button variant="ghost" className="mt-1 text-xs sm:text-sm h-7 px-2 sm:h-10 sm:px-4" onClick={() => setShowExpenseForm(true)}>
                   <PlusCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   Añadir gasto
@@ -211,6 +212,7 @@ function ExpenseList() {
   const { currency } = data
   const [showEditForm, setShowEditForm] = useState(false)
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false)
 
   // Ordenar gastos por fecha (más recientes primero)
   const sortedExpenses = [...data.expenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -218,6 +220,11 @@ function ExpenseList() {
   const handleEdit = (expense: Expense) => {
     setSelectedExpense(expense)
     setShowEditForm(true)
+  }
+
+  const handleShowDetails = (expense: Expense) => {
+    setSelectedExpense(expense)
+    setShowDetailsDialog(true)
   }
 
   const handleDelete = async (id: string) => {
@@ -240,6 +247,16 @@ function ExpenseList() {
     return <p className="text-center py-4 text-muted-foreground">No hay gastos registrados</p>
   }
 
+  const categoryNames: Record<string, string> = {
+    alimentacion: "Alimentación",
+    transporte: "Transporte",
+    servicios: "Servicios",
+    entretenimiento: "Entretenimiento",
+    salud: "Salud",
+    ahorro: "Ahorro",
+    otros: "Otros"
+  }
+
   return (
     <div className="space-y-4">
       {sortedExpenses.map((expense) => (
@@ -257,6 +274,9 @@ function ExpenseList() {
           <div className="flex items-center gap-2">
             <p className="font-medium text-red-600">{formatCurrency(expense.amount, currency)}</p>
             <div className="flex gap-1">
+              <Button variant="ghost" size="icon" onClick={() => handleShowDetails(expense)}>
+                <Eye className="h-4 w-4" />
+              </Button>
               <Button variant="ghost" size="icon" onClick={() => handleEdit(expense)}>
                 <Pencil className="h-4 w-4" />
               </Button>
@@ -284,6 +304,44 @@ function ExpenseList() {
           editingExpense={selectedExpense}
         />
       )}
+
+      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Detalles del Gasto</DialogTitle>
+          </DialogHeader>
+          {selectedExpense && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Descripción</p>
+                <p className="text-lg">{selectedExpense.description}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Monto</p>
+                <p className="text-lg text-red-600">{formatCurrency(selectedExpense.amount, currency)}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Fecha</p>
+                <p className="text-lg">{new Date(selectedExpense.date).toLocaleDateString("es-ES", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Categoría</p>
+                <p className="text-lg">{categoryNames[selectedExpense.category] || selectedExpense.category}</p>
+              </div>
+              {selectedExpense.notes && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Notas</p>
+                  <p className="text-lg">{selectedExpense.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -293,6 +351,7 @@ function IncomeList() {
   const { currency } = data
   const [showEditForm, setShowEditForm] = useState(false)
   const [selectedIncome, setSelectedIncome] = useState<Income | null>(null)
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false)
 
   // Ordenar ingresos por fecha (más recientes primero)
   const sortedIncomes = [...data.incomes].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -300,6 +359,11 @@ function IncomeList() {
   const handleEdit = (income: Income) => {
     setSelectedIncome(income)
     setShowEditForm(true)
+  }
+
+  const handleShowDetails = (income: Income) => {
+    setSelectedIncome(income)
+    setShowDetailsDialog(true)
   }
 
   const handleDelete = async (id: string) => {
@@ -322,6 +386,14 @@ function IncomeList() {
     return <p className="text-center py-4 text-muted-foreground">No hay ingresos registrados</p>
   }
 
+  const categoryNames: Record<string, string> = {
+    salary: "Salario",
+    freelance: "Trabajo freelance",
+    investment: "Inversiones",
+    gift: "Regalo",
+    other: "Otros"
+  }
+
   return (
     <div className="space-y-4">
       {sortedIncomes.map((income) => (
@@ -339,6 +411,9 @@ function IncomeList() {
           <div className="flex items-center gap-2">
             <p className="font-medium text-green-600">{formatCurrency(income.amount, currency)}</p>
             <div className="flex gap-1">
+              <Button variant="ghost" size="icon" onClick={() => handleShowDetails(income)}>
+                <Eye className="h-4 w-4" />
+              </Button>
               <Button variant="ghost" size="icon" onClick={() => handleEdit(income)}>
                 <Pencil className="h-4 w-4" />
               </Button>
@@ -366,6 +441,44 @@ function IncomeList() {
           editingIncome={selectedIncome}
         />
       )}
+
+      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Detalles del Ingreso</DialogTitle>
+          </DialogHeader>
+          {selectedIncome && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Descripción</p>
+                <p className="text-lg">{selectedIncome.description}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Monto</p>
+                <p className="text-lg text-green-600">{formatCurrency(selectedIncome.amount, currency)}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Fecha</p>
+                <p className="text-lg">{new Date(selectedIncome.date).toLocaleDateString("es-ES", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Categoría</p>
+                <p className="text-lg">{categoryNames[selectedIncome.category] || selectedIncome.category}</p>
+              </div>
+              {selectedIncome.notes && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Notas</p>
+                  <p className="text-lg">{selectedIncome.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

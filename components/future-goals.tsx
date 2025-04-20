@@ -15,6 +15,12 @@ import { formatCurrency } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
+import { CalendarIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 export default function FutureGoals() {
   const { data, addGoal, updateGoal, deleteGoal, addFundsToGoal } = useFinance()
@@ -33,7 +39,7 @@ export default function FutureGoals() {
   const [formattedTargetAmount, setFormattedTargetAmount] = useState("")
   const [currentAmount, setCurrentAmount] = useState("")
   const [formattedCurrentAmount, setFormattedCurrentAmount] = useState("")
-  const [deadline, setDeadline] = useState("")
+  const [deadline, setDeadline] = useState<Date | undefined>(undefined)
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null)
 
   // Efecto para actualizar los valores de progreso cuando cambian las metas
@@ -97,7 +103,7 @@ export default function FutureGoals() {
       description,
       targetAmount: Number(targetAmount),
       currentAmount: currentAmount ? Number(currentAmount) : 0,
-      deadline,
+      deadline: deadline.toISOString(),
     }
 
     if (editingGoalId) {
@@ -125,7 +131,7 @@ export default function FutureGoals() {
     setDescription("")
     setTargetAmount("")
     setCurrentAmount("")
-    setDeadline("")
+    setDeadline(undefined)
     setEditingGoalId(null)
     setShowForm(false)
   }
@@ -135,7 +141,7 @@ export default function FutureGoals() {
     setDescription(goal.description)
     setTargetAmount(goal.targetAmount.toString())
     setCurrentAmount(goal.currentAmount.toString())
-    setDeadline(goal.deadline)
+    setDeadline(new Date(goal.deadline))
     setEditingGoalId(goal.id)
     setShowForm(true)
   }
@@ -275,14 +281,29 @@ export default function FutureGoals() {
 
               <div className="space-y-2">
                 <Label htmlFor="deadline" className="text-sm font-medium">Fecha límite</Label>
-                <Input
-                  id="deadline"
-                  placeholder="Ej: Diciembre 2025"
-                  value={deadline}
-                  onChange={(e) => setDeadline(e.target.value)}
-                  required
-                  className="w-full"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button 
+                      variant={"outline"} 
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !deadline && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {deadline ? format(deadline, "MMMM yyyy", { locale: es }).replace(/^\w/, c => c.toUpperCase()) : "Selecciona una fecha"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar 
+                      mode="single" 
+                      selected={deadline} 
+                      onSelect={setDeadline}
+                      initialFocus 
+                      className="rounded-md border"
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
@@ -362,7 +383,7 @@ export default function FutureGoals() {
                   </Progress>
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <span className="text-sm text-muted-foreground">
-                      Fecha límite: {goal.deadline}
+                      Fecha límite: {new Date(goal.deadline).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}
                     </span>
                     <Button
                       variant="outline"

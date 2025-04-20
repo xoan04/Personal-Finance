@@ -136,7 +136,11 @@ export default function BudgetOverview() {
     }
 
     if (editingRule) {
-      updateBudgetRule(editingRule.id, ruleData)
+      updateBudgetRule({
+        ...ruleData,
+        id: editingRule.id,
+        isDefault: editingRule.isDefault
+      })
       toast({
         title: "Regla actualizada",
         description: "La regla ha sido actualizada correctamente"

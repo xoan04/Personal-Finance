@@ -10,18 +10,19 @@ import {
   onAuthStateChanged,
   type User,
   type UserCredential,
+  updateProfile
 } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 
-type AuthContextType = {
+interface AuthContextType {
   user: User | null
   loading: boolean
-  register: (email: string, password: string) => Promise<UserCredential>
-  login: (email: string, password: string) => Promise<UserCredential>
+  register: (email: string, password: string, name: string) => Promise<void>
+  login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextType>({} as AuthContextType)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -29,8 +30,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Observar cambios en el estado de autenticación
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser)
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user)
       setLoading(false)
     })
 
@@ -38,35 +39,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // Función para registrar un nuevo usuario
-  const register = (email: string, password: string) => {
-    return createUserWithEmailAndPassword(auth, email, password)
+  const register = async (email: string, password: string, name: string) => {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+    // Actualizar el perfil del usuario con su nombre
+    await updateProfile(userCredential.user, {
+      displayName: name
+    })
   }
 
   // Función para iniciar sesión
-  const login = (email: string, password: string) => {
-    return signInWithEmailAndPassword(auth, email, password)
+  const login = async (email: string, password: string) => {
+    await signInWithEmailAndPassword(auth, email, password)
   }
 
   // Función para cerrar sesión
-  const logout = () => {
-    return signOut(auth)
+  const logout = async () => {
+    await signOut(auth)
   }
 
-  const value = {
-    user,
-    loading,
-    register,
-    login,
-    logout,
-  }
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, loading, register, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error("useAuth debe ser usado dentro de un AuthProvider")
-  }
-  return context
-}
+export const useAuth = () => useContext(AuthContext)

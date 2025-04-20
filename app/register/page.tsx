@@ -17,6 +17,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [name, setName] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const { register } = useAuth()
@@ -25,6 +26,11 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+
+    if (!name.trim()) {
+      setError("El nombre es requerido")
+      return
+    }
 
     // Validar que las contraseñas coincidan
     if (password !== confirmPassword) {
@@ -41,7 +47,7 @@ export default function RegisterPage() {
     setIsLoading(true)
 
     try {
-      await register(email, password)
+      await register(email, password, name)
       router.push("/")
     } catch (error: any) {
       console.error("Error al registrar usuario:", error)
@@ -75,6 +81,17 @@ export default function RegisterPage() {
             </Alert>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nombre</Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Tu nombre"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="email">Correo electrónico</Label>
               <Input
