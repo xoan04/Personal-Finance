@@ -13,11 +13,13 @@ import {
   updateProfile
 } from "firebase/auth"
 import { auth } from "@/lib/firebase"
+import { doc, setDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 interface AuthContextType {
   user: User | null
   loading: boolean
-  register: (email: string, password: string, name: string) => Promise<void>
+  register: (email: string, password: string, name: string, lastName: string) => Promise<void>
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
@@ -39,11 +41,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // Función para registrar un nuevo usuario
-  const register = async (email: string, password: string, name: string) => {
+  const register = async (email: string, password: string, name: string, lastName: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password)
-    // Actualizar el perfil del usuario con su nombre
+    // Actualizar el perfil del usuario con su nombre completo
     await updateProfile(userCredential.user, {
-      displayName: name
+      displayName: `${name} ${lastName}`
+    })
+
+    // Guardar datos adicionales en Firestore
+    await setDoc(doc(db, "users", userCredential.user.uid), {
+      name,
+      lastName,
+      email,
+      createdAt: new Date(),
+      updatedAt: new Date()
     })
   }
 

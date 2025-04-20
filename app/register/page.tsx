@@ -18,6 +18,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [name, setName] = useState("")
+  const [lastName, setLastName] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const { register } = useAuth()
@@ -27,18 +28,16 @@ export default function RegisterPage() {
     e.preventDefault()
     setError("")
 
-    if (!name.trim()) {
-      setError("El nombre es requerido")
+    if (!name.trim() || !lastName.trim()) {
+      setError("El nombre y apellido son requeridos")
       return
     }
 
-    // Validar que las contraseñas coincidan
     if (password !== confirmPassword) {
       setError("Las contraseñas no coinciden")
       return
     }
 
-    // Validar que la contraseña tenga al menos 6 caracteres
     if (password.length < 6) {
       setError("La contraseña debe tener al menos 6 caracteres")
       return
@@ -47,12 +46,11 @@ export default function RegisterPage() {
     setIsLoading(true)
 
     try {
-      await register(email, password, name)
+      await register(email, password, name, lastName)
       router.push("/")
     } catch (error: any) {
       console.error("Error al registrar usuario:", error)
 
-      // Manejar errores específicos de Firebase
       if (error.code === "auth/email-already-in-use") {
         setError("Este correo electrónico ya está en uso")
       } else if (error.code === "auth/invalid-email") {
@@ -82,16 +80,29 @@ export default function RegisterPage() {
               </Alert>
             )}
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nombre</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="Tu nombre"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nombre</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Tu nombre"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Apellido</Label>
+                  <Input
+                    id="lastName"
+                    type="text"
+                    placeholder="Tu apellido"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Correo electrónico</Label>
