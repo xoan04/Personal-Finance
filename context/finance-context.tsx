@@ -202,32 +202,33 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Agrupar gastos por categoría
     const categories: Record<string, { amount: number; color: string }> = {
-      housing: { amount: 0, color: "bg-blue-500" },
-      food: { amount: 0, color: "bg-green-500" },
-      transport: { amount: 0, color: "bg-yellow-500" },
-      utilities: { amount: 0, color: "bg-purple-500" },
-      entertainment: { amount: 0, color: "bg-pink-500" },
-      health: { amount: 0, color: "bg-red-500" },
-      other: { amount: 0, color: "bg-gray-500" },
+      alimentacion: { amount: 0, color: "bg-blue-500" },
+      transporte: { amount: 0, color: "bg-green-500" },
+      servicios: { amount: 0, color: "bg-yellow-500" },
+      entretenimiento: { amount: 0, color: "bg-purple-500" },
+      salud: { amount: 0, color: "bg-red-500" },
+      ahorro: { amount: 0, color: "bg-teal-500" },
+      otros: { amount: 0, color: "bg-gray-500" },
     }
 
     // Mapeo de categorías en español
     const categoryNames: Record<string, string> = {
-      housing: "Vivienda",
-      food: "Alimentación",
-      transport: "Transporte",
-      utilities: "Servicios",
-      entertainment: "Entretenimiento",
-      health: "Salud",
-      other: "Otros",
+      alimentacion: "Alimentación",
+      transporte: "Transporte",
+      servicios: "Servicios",
+      entretenimiento: "Entretenimiento",
+      salud: "Salud",
+      ahorro: "Ahorro",
+      otros: "Otros",
     }
 
     // Agrupar gastos por categoría
     data.expenses.forEach((expense) => {
-      if (categories[expense.category]) {
-        categories[expense.category].amount += expense.amount
+      const categoryKey = expense.category.toLowerCase()
+      if (categories[categoryKey]) {
+        categories[categoryKey].amount += expense.amount
       } else {
-        categories.other.amount += expense.amount
+        categories.otros.amount += expense.amount
       }
     })
 
