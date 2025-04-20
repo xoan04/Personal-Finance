@@ -140,7 +140,9 @@ export default function FutureGoals() {
     setTitle(goal.title)
     setDescription(goal.description)
     setTargetAmount(goal.targetAmount.toString())
+    setFormattedTargetAmount(formatNumber(goal.targetAmount.toString()))
     setCurrentAmount(goal.currentAmount.toString())
+    setFormattedCurrentAmount(formatNumber(goal.currentAmount.toString()))
     setDeadline(new Date(goal.deadline))
     setEditingGoalId(goal.id)
     setShowForm(true)
@@ -270,12 +272,16 @@ export default function FutureGoals() {
                       id="currentAmount"
                       type="text"
                       inputMode="numeric"
-                      className="pl-7 w-full"
+                      className="pl-7 w-full bg-muted cursor-not-allowed"
                       placeholder="0"
                       value={formattedCurrentAmount}
-                      onChange={handleCurrentAmountChange}
+                      disabled
+                      title="Este valor solo se puede modificar usando 'Añadir Fondos'"
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Este valor solo se puede modificar usando la opción "Añadir Fondos"
+                  </p>
                 </div>
               </div>
 

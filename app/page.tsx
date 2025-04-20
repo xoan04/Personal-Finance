@@ -30,9 +30,9 @@ export default function Home() {
 
   const content = (
     <div className="container mx-auto px-4 py-4 sm:py-6">
-      <div className="flex justify-between items-center mb-4 sm:mb-6">
-        <h1 className="text-xl sm:text-3xl font-bold">Mi Presupuesto Personal</h1>
-        <div className="flex items-center gap-3 sm:gap-4">
+      <div className="flex items-center gap-2 mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-3xl font-bold truncate">Mi Presupuesto Personal</h1>
+        <div className="flex items-center gap-2 shrink-0 ml-auto">
           <CurrencySelector />
           <UserNav />
         </div>
@@ -94,13 +94,13 @@ export default function Home() {
 
           <Tabs defaultValue="overview" className="mb-6">
             <div className="relative w-full mb-4">
-              <div className="overflow-x-auto scrollbar-none">
-                <TabsList className="inline-flex w-full sm:w-auto h-auto p-1 bg-muted/50">
-                  <TabsTrigger value="overview" className="text-sm px-2.5 py-1.5">Resumen</TabsTrigger>
-                  <TabsTrigger value="expenses" className="text-sm px-2.5 py-1.5">Gastos</TabsTrigger>
-                  <TabsTrigger value="income" className="text-sm px-2.5 py-1.5">Ingresos</TabsTrigger>
-                  <TabsTrigger value="budget" className="text-sm px-2.5 py-1.5">Presupuesto</TabsTrigger>
-                  <TabsTrigger value="goals" className="text-sm px-2.5 py-1.5">Metas</TabsTrigger>
+              <div className="w-full overflow-x-auto scrollbar-none -mx-4 sm:mx-0 px-4 sm:px-0">
+                <TabsList className="inline-flex min-w-full sm:min-w-0 sm:w-auto h-auto p-1 bg-muted/50 overflow-x-auto whitespace-nowrap scrollbar-none">
+                  <TabsTrigger value="overview" className="text-sm px-2.5 py-1.5 flex-shrink-0">Resumen</TabsTrigger>
+                  <TabsTrigger value="expenses" className="text-sm px-2.5 py-1.5 flex-shrink-0">Gastos</TabsTrigger>
+                  <TabsTrigger value="income" className="text-sm px-2.5 py-1.5 flex-shrink-0">Ingresos</TabsTrigger>
+                  <TabsTrigger value="budget" className="text-sm px-2.5 py-1.5 flex-shrink-0">Presupuesto</TabsTrigger>
+                  <TabsTrigger value="goals" className="text-sm px-2.5 py-1.5 flex-shrink-0">Metas</TabsTrigger>
                 </TabsList>
               </div>
             </div>

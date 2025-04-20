@@ -86,9 +86,23 @@ export default function BudgetOverview() {
   // Calcular valores para cada categoría de la regla activa
   const categoryValues = activeRule.categories.map((category: Category) => {
     const target = totalIncome * (category.percentage / 100)
-    // Por ahora usamos una distribución simple de gastos
-    const current = totalExpenses * (category.percentage / 100)
-    const percent = target > 0 ? Math.min(100, (current / target) * 100) : 0
+    let current = 0;
+
+    // Calcular el total actual según las categorías de gastos
+    data.expenses.forEach((expense) => {
+      if (category.name === "Necesidades" && 
+          ["alimentacion", "transporte", "servicios", "salud"].includes(expense.category)) {
+        current += expense.amount;
+      } else if (category.name === "Deseos" && 
+                ["entretenimiento", "otros"].includes(expense.category)) {
+        current += expense.amount;
+      } else if (category.name === "Ahorros" && 
+                expense.category === "ahorro") {
+        current += expense.amount;
+      }
+    });
+
+    const percent = target > 0 ? Math.min(100, (current / target) * 100) : 0;
 
     return {
       ...category,
