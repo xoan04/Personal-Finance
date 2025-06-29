@@ -81,7 +81,7 @@ export function ExpenseForm({ onClose, editingExpense }: ExpenseFormProps) {
     const expenseData = {
       description,
       amount: parseFloat(amount.replace(/[^\d]/g, "")),
-      date: new Date(date).toISOString(),
+      date: date,
       category,
       notes,
     }

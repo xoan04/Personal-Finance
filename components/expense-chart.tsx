@@ -5,10 +5,21 @@ import { useFinance } from "@/context/finance-context"
 import { formatCurrency } from "@/lib/utils"
 
 export default function ExpenseChart() {
-  const { data } = useFinance()
+  const { data, monthlyData } = useFinance()
   const { currency } = data
 
-  const chartData = Object.entries(data.monthlyExpenses).map(([name, gastos]) => ({ name, gastos }))
+  // Calcular gastos por categoría del mes seleccionado
+  const categoryTotals: Record<string, number> = {}
+  
+  monthlyData.expenses.forEach((expense) => {
+    const category = expense.category
+    categoryTotals[category] = (categoryTotals[category] || 0) + expense.amount
+  })
+
+  const chartData = Object.entries(categoryTotals).map(([category, amount]) => ({
+    name: category,
+    gastos: amount
+  }))
 
   if (chartData.length === 0) {
     return (

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useMemo } from "react"
 import type { Currency, Expense, FinanceData, Goal, Income, BudgetRule } from "@/lib/types"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/context/auth-context"
@@ -61,6 +61,13 @@ const initialData: FinanceData = {
 // Crear el contexto
 type FinanceContextType = {
   data: FinanceData
+  monthlyData: {
+    expenses: Expense[]
+    incomes: Income[]
+    goals: Goal[]
+  }
+  selectedMonth: string
+  setSelectedMonth: (month: string) => void
   addExpense: (expense: Omit<Expense, "id">) => Promise<void>
   updateExpense: (expense: Expense) => Promise<void>
   deleteExpense: (id: string) => Promise<void>
@@ -86,9 +93,53 @@ const FinanceContext = createContext<FinanceContextType | undefined>(undefined)
 
 // Proveedor del contexto
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
   const [data, setData] = useState<FinanceData>(initialData)
   const [loading, setLoading] = useState(true)
-  const { user } = useAuth()
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date()
+    const monthString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    return monthString
+  })
+
+  // Wrapper para setSelectedMonth con logging
+  const setSelectedMonthWithLog = (month: string) => {
+    setSelectedMonth(month)
+  }
+
+  // Función para obtener el primer y último día del mes seleccionado
+  const getMonthRange = (monthString: string) => {
+    const [year, month] = monthString.split('-').map(Number)
+    const startDate = new Date(year, month - 1, 1)
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999) // month (no month-1) para obtener el último día del mes
+    return { startDate, endDate }
+  }
+
+  // Función para filtrar transacciones por mes
+  const filterTransactionsByMonth = (transactions: any[], monthString: string) => {
+    const [year, month] = monthString.split('-').map(Number)
+    return transactions.filter(transaction => {
+      const [tYear, tMonth] = transaction.date.split('-').map(Number)
+      return tYear === year && tMonth === month
+    })
+  }
+
+  // Datos filtrados por mes
+  const monthlyData = useMemo(() => {
+    return {
+      expenses: filterTransactionsByMonth(data.expenses, selectedMonth),
+      incomes: filterTransactionsByMonth(data.incomes, selectedMonth),
+      goals: data.goals, // Las metas no se filtran por mes
+    }
+  }, [data.expenses, data.incomes, data.goals, selectedMonth])
+
+  // Calcular totales del mes seleccionado
+  const { totalIncome, totalExpenses, balance } = useMemo(() => {
+    const income = monthlyData.incomes.reduce((sum, income) => sum + income.amount, 0)
+    const expenses = monthlyData.expenses.reduce((sum, expense) => sum + expense.amount, 0)
+    const balance = income - expenses
+    return { totalIncome: income, totalExpenses: expenses, balance }
+  }, [monthlyData.incomes, monthlyData.expenses])
 
   // Cargar datos de Firestore cuando el usuario inicia sesión
   useEffect(() => {
@@ -193,11 +244,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [data, user])
 
-  // Calcular totales
-  const totalIncome = data.incomes.reduce((sum, income) => sum + income.amount, 0)
-  const totalExpenses = data.expenses.reduce((sum, expense) => sum + expense.amount, 0)
-  const balance = totalIncome - totalExpenses
-
   // Actualizar desglose por categoría cuando cambian los gastos
   useEffect(() => {
     // Agrupar gastos por categoría
@@ -222,7 +268,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       otros: "Otros",
     }
 
-    // Agrupar gastos por categoría
+    // Agrupar gastos por categoría (usando todos los datos, no solo el mes seleccionado)
     data.expenses.forEach((expense) => {
       const categoryKey = expense.category.toLowerCase()
       if (categories[categoryKey]) {
@@ -243,8 +289,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       .filter((category) => category.amount > 0)
       .sort((a, b) => b.amount - a.amount)
 
-    // Actualizar datos de gastos mensuales
-    const monthlyData: Record<string, number> = {}
+    // Actualizar datos de gastos mensuales (mantener para compatibilidad)
+    const monthlyExpensesData: Record<string, number> = {}
 
     // Inicializar los últimos 6 meses
     const today = new Date()
@@ -253,24 +299,24 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     for (let i = 5; i >= 0; i--) {
       const month = new Date(today.getFullYear(), today.getMonth() - i, 1)
       const monthKey = `${monthNames[month.getMonth()]} ${month.getFullYear()}`
-      monthlyData[monthKey] = 0
+      monthlyExpensesData[monthKey] = 0
     }
 
-    // Sumar gastos por mes
+    // Sumar gastos por mes (usando todos los datos, no solo el mes seleccionado)
     data.expenses.forEach((expense) => {
       const date = new Date(expense.date)
       const monthKey = `${monthNames[date.getMonth()]} ${date.getFullYear()}`
-      if (monthlyData[monthKey] !== undefined) {
-        monthlyData[monthKey] += expense.amount
+      if (monthlyExpensesData[monthKey] !== undefined) {
+        monthlyExpensesData[monthKey] += expense.amount
       }
     })
 
     setData((prev) => ({
       ...prev,
       categoryBreakdown,
-      monthlyExpenses: monthlyData,
+      monthlyExpenses: monthlyExpensesData,
     }))
-  }, [data.expenses, totalExpenses])
+  }, [data.expenses])
 
   // Funciones para manipular datos
   const addExpense = async (expense: Omit<Expense, "id">) => {
@@ -626,7 +672,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       const expenseData = {
         description: `Fondos para meta: ${goalToUpdate.title}`,
         amount: amount,
-        date: new Date().toISOString(),
+        date: new Date().toISOString().split("T")[0], // Formato YYYY-MM-DD consistente
         category: "ahorro",
         notes: `Fondos para meta: ${goalToUpdate.title}`, // Formato consistente para identificar la meta
       }
@@ -708,25 +754,18 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const budgetRulesRef = doc(db, "budgetRules", user.uid)
         const budgetRulesDoc = await getDoc(budgetRulesRef)
   
-        console.log("📤 Regla recibida para actualizar:", updatedRule)
-  
         if (budgetRulesDoc.exists()) {
           const currentRules = budgetRulesDoc.data().rules || []
-  
-          console.log("📥 Reglas actuales:", currentRules)
   
           const updatedRules = currentRules.map((rule: BudgetRule) =>
             rule.id === updatedRule.id ? updatedRule : rule
           )
-  
-          console.log("🔁 Reglas después del update:", updatedRules)
   
           const hasInvalid = updatedRules.some((rule: BudgetRule) =>
             rule === undefined || Object.values(rule).some((v) => v === undefined)
           )
   
           if (hasInvalid) {
-            console.error("❌ Reglas inválidas detectadas en update:", updatedRules)
             throw new Error("No se puede actualizar con reglas inválidas")
           }
   
@@ -735,7 +774,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             updatedAt: new Date()
           })
         } else {
-          console.log("📄 Documento no existe, creando uno nuevo con la regla")
           await setDoc(budgetRulesRef, {
             rules: [updatedRule],
             createdAt: new Date(),
@@ -762,7 +800,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     try {
       // Prevenir la eliminación de la regla por defecto
       if (ruleId === "50-30-20") {
-        console.error("No se puede eliminar la regla por defecto 50/30/20")
         return
       }
 
@@ -826,6 +863,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     <FinanceContext.Provider
       value={{
         data,
+        monthlyData,
+        selectedMonth,
+        setSelectedMonth: setSelectedMonthWithLog,
         addExpense,
         updateExpense,
         deleteExpense,

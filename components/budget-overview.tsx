@@ -42,7 +42,7 @@ const categoryDescriptions: Record<string, string> = {
 }
 
 export default function BudgetOverview() {
-  const { totalIncome, totalExpenses, data, addBudgetRule, updateBudgetRule, deleteBudgetRule, setActiveBudgetRule } = useFinance()
+  const { totalIncome, totalExpenses, data, monthlyData, addBudgetRule, updateBudgetRule, deleteBudgetRule, setActiveBudgetRule } = useFinance()
   const { currency, budgetRules = [], activeBudgetRuleId } = data || {}
   const [showRuleForm, setShowRuleForm] = useState(false)
   const [editingRule, setEditingRule] = useState<BudgetRule | null>(null)
@@ -89,7 +89,7 @@ export default function BudgetOverview() {
     let current = 0;
 
     // Calcular el total actual según las categorías de gastos
-    data.expenses.forEach((expense) => {
+    monthlyData.expenses.forEach((expense) => {
       if (category.name === "Necesidades" && 
           ["alimentacion", "transporte", "servicios", "salud"].includes(expense.category)) {
         current += expense.amount;

@@ -7,11 +7,9 @@ import { Button } from "@/components/ui/button"
 import { PlusCircle, Loader2, Pencil, Trash2, Eye } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import type { Expense, Income } from "@/lib/types"
-import BudgetOverview from "@/components/budget-overview"
 import { ExpenseForm } from "@/components/expense-form"
 import IncomeForm from "@/components/income-form"
-import ExpenseChart from "@/components/expense-chart"
-import CategoryBreakdown from "@/components/category-breakdown"
+import BudgetOverview from "@/components/budget-overview"
 import FutureGoals from "@/components/future-goals"
 import { useFinance } from "@/context/finance-context"
 import { formatCurrency } from "@/lib/utils"
@@ -21,18 +19,30 @@ import { useAuth } from "@/context/auth-context"
 import ProtectedRoute from "@/components/protected-route"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import MonthSelector from "@/components/month-selector"
+import MonthlyCategoryBreakdown from "@/components/monthly-category-breakdown"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
 
 export default function Home() {
   const [showExpenseForm, setShowExpenseForm] = useState(false)
   const [showIncomeForm, setShowIncomeForm] = useState(false)
-  const { totalIncome, totalExpenses, balance, data, loading } = useFinance()
+  const { totalIncome, totalExpenses, balance, data, loading, monthlyData, selectedMonth } = useFinance()
   const { user } = useAuth()
+
+  // Formatear el mes seleccionado para mostrar
+  const formatSelectedMonth = () => {
+    const [year, month] = selectedMonth.split('-').map(Number)
+    const date = new Date(year, month - 1, 1)
+    return format(date, "MMMM 'de' yyyy", { locale: es })
+  }
 
   const content = (
     <div className="container mx-auto px-4 py-4 sm:py-6">
       <div className="flex items-center gap-2 mb-4 sm:mb-6">
         <h1 className="text-xl sm:text-3xl font-bold truncate">Mi Presupuesto Personal</h1>
         <div className="flex items-center gap-2 shrink-0 ml-auto">
+          <MonthSelector />
           <CurrencySelector />
           <UserNav />
         </div>
@@ -45,11 +55,21 @@ export default function Home() {
         </div>
       ) : (
         <>
+          {/* Información del mes seleccionado */}
+          <div className="mb-4 sm:mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-center mb-2">
+              {formatSelectedMonth()}
+            </h2>
+            <p className="text-sm text-muted-foreground text-center">
+              Balance y transacciones del mes seleccionado
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-6">
             <Card className="shadow-sm">
               <CardHeader className="pb-2 space-y-0 px-3 sm:px-6 pt-3 sm:pt-6">
-                <CardTitle className="text-sm sm:text-lg">Ingresos Mensuales</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Total de ingresos este mes</CardDescription>
+                <CardTitle className="text-sm sm:text-lg">Ingresos del Mes</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Total de ingresos en {formatSelectedMonth()}</CardDescription>
               </CardHeader>
               <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
                 <div className="text-lg sm:text-2xl font-bold text-green-600">{formatCurrency(totalIncome, data.currency)}</div>
@@ -62,8 +82,8 @@ export default function Home() {
 
             <Card className="shadow-sm">
               <CardHeader className="pb-2 space-y-0 px-3 sm:px-6 pt-3 sm:pt-6">
-                <CardTitle className="text-sm sm:text-lg">Gastos Mensuales</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Total de gastos este mes</CardDescription>
+                <CardTitle className="text-sm sm:text-lg">Gastos del Mes</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Total de gastos en {formatSelectedMonth()}</CardDescription>
               </CardHeader>
               <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
                 <div className="text-lg sm:text-2xl font-bold text-red-600">{formatCurrency(totalExpenses, data.currency)}</div>
@@ -76,52 +96,73 @@ export default function Home() {
 
             <Card className="shadow-sm">
               <CardHeader className="pb-2 space-y-0 px-3 sm:px-6 pt-3 sm:pt-6">
-                <CardTitle className="text-sm sm:text-lg">Balance</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Dinero disponible</CardDescription>
+                <CardTitle className="text-sm sm:text-lg">Balance del Mes</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Balance en {formatSelectedMonth()}</CardDescription>
               </CardHeader>
               <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-                <div className={`text-lg sm:text-2xl font-bold ${balance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                <div className={`text-lg sm:text-2xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {formatCurrency(balance, data.currency)}
                 </div>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-2">
-                  {totalIncome > 0
-                    ? `${Math.round((balance / totalIncome) * 100)}% de tus ingresos`
-                    : "0% de tus ingresos"}
+                <p className="text-xs text-muted-foreground mt-1">
+                  {balance >= 0 ? 'Superávit' : 'Déficit'}
                 </p>
               </CardContent>
             </Card>
           </div>
 
-          <Tabs defaultValue="overview" className="mb-6">
-            <div className="relative w-full mb-4">
-              <div className="w-full overflow-x-auto scrollbar-none -mx-4 sm:mx-0 px-4 sm:px-0">
-                <TabsList className="inline-flex min-w-full sm:min-w-0 sm:w-auto h-auto p-1 bg-muted/50 overflow-x-auto whitespace-nowrap scrollbar-none">
-                  <TabsTrigger value="overview" className="text-sm px-2.5 py-1.5 flex-shrink-0">Resumen</TabsTrigger>
-                  <TabsTrigger value="expenses" className="text-sm px-2.5 py-1.5 flex-shrink-0">Gastos</TabsTrigger>
-                  <TabsTrigger value="income" className="text-sm px-2.5 py-1.5 flex-shrink-0">Ingresos</TabsTrigger>
-                  <TabsTrigger value="budget" className="text-sm px-2.5 py-1.5 flex-shrink-0">Presupuesto</TabsTrigger>
-                  <TabsTrigger value="goals" className="text-sm px-2.5 py-1.5 flex-shrink-0">Metas</TabsTrigger>
-                </TabsList>
-              </div>
-            </div>
+          <Tabs defaultValue="overview" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="overview">Resumen</TabsTrigger>
+              <TabsTrigger value="expenses">Gastos</TabsTrigger>
+              <TabsTrigger value="income">Ingresos</TabsTrigger>
+              <TabsTrigger value="budget">Presupuesto</TabsTrigger>
+              <TabsTrigger value="goals">Metas</TabsTrigger>
+            </TabsList>
 
             <TabsContent value="overview">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <Card>
                   <CardHeader>
                     <CardTitle>Gastos por Categoría</CardTitle>
+                    <CardDescription>Distribución de gastos en {formatSelectedMonth()}</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ExpenseChart />
+                    <MonthlyCategoryBreakdown />
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Desglose por Categoría</CardTitle>
+                    <CardTitle>Resumen del Mes</CardTitle>
+                    <CardDescription>Balance general de {formatSelectedMonth()}</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <CategoryBreakdown />
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Ingresos totales:</span>
+                        <span className="text-green-600 font-semibold">{formatCurrency(totalIncome, data.currency)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Gastos totales:</span>
+                        <span className="text-red-600 font-semibold">{formatCurrency(totalExpenses, data.currency)}</span>
+                      </div>
+                      <div className="border-t pt-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Balance:</span>
+                          <span className={`font-semibold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(balance, data.currency)}
+                          </span>
+                        </div>
+                      </div>
+                      {totalIncome > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Porcentaje de ahorro:</span>
+                          <span className={`font-semibold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {((balance / totalIncome) * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -130,8 +171,8 @@ export default function Home() {
             <TabsContent value="expenses">
               <Card>
                 <CardHeader>
-                  <CardTitle>Historial de Gastos</CardTitle>
-                  <CardDescription>Todos tus gastos recientes</CardDescription>
+                  <CardTitle>Historial de Gastos - {formatSelectedMonth()}</CardTitle>
+                  <CardDescription>Gastos registrados en {formatSelectedMonth()}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ExpenseList />
@@ -142,8 +183,8 @@ export default function Home() {
             <TabsContent value="income">
               <Card>
                 <CardHeader>
-                  <CardTitle>Historial de Ingresos</CardTitle>
-                  <CardDescription>Todos tus ingresos recientes</CardDescription>
+                  <CardTitle>Historial de Ingresos - {formatSelectedMonth()}</CardTitle>
+                  <CardDescription>Ingresos registrados en {formatSelectedMonth()}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <IncomeList />
@@ -208,14 +249,25 @@ export default function Home() {
 }
 
 function ExpenseList() {
-  const { data, updateExpense, deleteExpense } = useFinance()
+  const { monthlyData, data, updateExpense, deleteExpense } = useFinance()
   const { currency } = data
   const [showEditForm, setShowEditForm] = useState(false)
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
 
   // Ordenar gastos por fecha (más recientes primero)
-  const sortedExpenses = [...data.expenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  const sortedExpenses = [...monthlyData.expenses].sort((a, b) => {
+    // Asegurar que las fechas se parseen correctamente
+    const dateA = new Date(a.date)
+    const dateB = new Date(b.date)
+    
+    // Si las fechas son iguales, ordenar por ID (más reciente primero)
+    if (dateA.getTime() === dateB.getTime()) {
+      return parseInt(b.id) - parseInt(a.id)
+    }
+    
+    return dateB.getTime() - dateA.getTime()
+  })
 
   const handleEdit = (expense: Expense) => {
     setSelectedExpense(expense)
@@ -347,14 +399,25 @@ function ExpenseList() {
 }
 
 function IncomeList() {
-  const { data, updateIncome, deleteIncome } = useFinance()
+  const { monthlyData, data, updateIncome, deleteIncome } = useFinance()
   const { currency } = data
   const [showEditForm, setShowEditForm] = useState(false)
   const [selectedIncome, setSelectedIncome] = useState<Income | null>(null)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
 
   // Ordenar ingresos por fecha (más recientes primero)
-  const sortedIncomes = [...data.incomes].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  const sortedIncomes = [...monthlyData.incomes].sort((a, b) => {
+    // Asegurar que las fechas se parseen correctamente
+    const dateA = new Date(a.date)
+    const dateB = new Date(b.date)
+    
+    // Si las fechas son iguales, ordenar por ID (más reciente primero)
+    if (dateA.getTime() === dateB.getTime()) {
+      return parseInt(b.id) - parseInt(a.id)
+    }
+    
+    return dateB.getTime() - dateA.getTime()
+  })
 
   const handleEdit = (income: Income) => {
     setSelectedIncome(income)
