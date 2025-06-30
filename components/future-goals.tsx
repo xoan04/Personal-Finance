@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { PlusCircle, Pencil, Trash2 } from "lucide-react"
+import { PlusCircle, Pencil, Trash2, Target, TrendingUp, Calendar as CalendarIcon } from "lucide-react"
 import { useFinance } from "@/context/finance-context"
 import { formatCurrency } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
@@ -19,8 +19,9 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { CalendarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { AnimatedCounter } from "@/components/ui/animated-counter"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
 export default function FutureGoals() {
   const { data, addGoal, updateGoal, deleteGoal, addFundsToGoal } = useFinance()
@@ -31,6 +32,7 @@ export default function FutureGoals() {
   const [fundsToAdd, setFundsToAdd] = useState("")
   const [formattedFundsToAdd, setFormattedFundsToAdd] = useState("")
   const [progressValues, setProgressValues] = useState<Record<string, number>>({})
+  const [isLoading, setIsLoading] = useState(true)
 
   // Estados para el formulario de metas
   const [title, setTitle] = useState("")
@@ -41,6 +43,15 @@ export default function FutureGoals() {
   const [formattedCurrentAmount, setFormattedCurrentAmount] = useState("")
   const [deadline, setDeadline] = useState<Date | undefined>(undefined)
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Simular tiempo de carga para mostrar las animaciones
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [])
 
   // Efecto para actualizar los valores de progreso cuando cambian las metas
   useEffect(() => {
@@ -198,13 +209,24 @@ export default function FutureGoals() {
     }
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-10">
+        <LoadingSpinner size="lg" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
-        <h2 className="text-xl sm:text-2xl font-bold">Mis Metas Financieras</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 animate-fade-in-up">
+        <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+          <Target className="h-6 w-6 text-primary" />
+          Mis Metas Financieras
+        </h2>
         <Button 
           onClick={() => setShowForm(!showForm)}
-          className="w-full sm:w-auto"
+          className="w-full sm:w-auto hover:scale-105 transition-transform duration-200"
         >
           <PlusCircle className="h-4 w-4 mr-2" />
           Nueva Meta
@@ -212,9 +234,10 @@ export default function FutureGoals() {
       </div>
 
       {showForm && (
-        <Card className="w-full">
+        <Card className="w-full animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
           <CardHeader>
-            <CardTitle className="text-lg sm:text-xl">
+            <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
               {editingGoalId ? "Editar Meta" : "Crear Nueva Meta"}
             </CardTitle>
             <CardDescription className="text-sm">
@@ -334,20 +357,34 @@ export default function FutureGoals() {
       )}
 
       {data.goals.length === 0 ? (
-        <div className="text-center py-10">
+        <div className="text-center py-10 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
+            <Target className="h-8 w-8 text-muted-foreground" />
+          </div>
           <p className="text-sm sm:text-base text-muted-foreground">
             No tienes metas financieras. ¡Crea una ahora!
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Las metas te ayudarán a mantener el enfoque en tus objetivos financieros
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-          {data.goals.map((goal) => (
-            <Card key={goal.id} className="w-full">
+          {data.goals.map((goal, index) => (
+            <Card key={goal.id} className="w-full hover:shadow-md transition-all duration-300 animate-fade-in-up" style={{ animationDelay: `${0.3 + index * 0.1}s` }}>
               <CardHeader>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
-                  <CardTitle className="text-lg sm:text-xl">{goal.title}</CardTitle>
+                  <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
+                    <Target className="h-5 w-5 text-primary" />
+                    {goal.title}
+                  </CardTitle>
                   <div className="flex gap-1 w-full sm:w-auto justify-end">
-                    <Button variant="ghost" size="icon" onClick={() => handleEdit(goal)}>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => handleEdit(goal)}
+                      className="hover:scale-110 transition-transform duration-200"
+                    >
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <DeleteConfirmationDialog
@@ -355,7 +392,7 @@ export default function FutureGoals() {
                       description={`¿Estás seguro de que deseas eliminar la meta "${goal.title}"? Esta acción no se puede deshacer.`}
                       onDelete={() => handleDelete(goal.id)}
                       trigger={
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="hover:scale-110 transition-transform duration-200">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       }
@@ -367,34 +404,37 @@ export default function FutureGoals() {
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0">
-                    <span className="text-sm font-medium">Progreso:</span>
+                    <span className="text-sm font-medium flex items-center gap-1">
+                      <TrendingUp className="h-4 w-4 text-primary" />
+                      Progreso:
+                    </span>
                     <span className="text-sm text-muted-foreground">
-                      {formatCurrency(goal.currentAmount, currency)} / {formatCurrency(goal.targetAmount, currency)}
+                      <AnimatedCounter 
+                        value={goal.currentAmount} 
+                        currency={currency}
+                        duration={1500}
+                        delay={600 + index * 200}
+                      /> / <AnimatedCounter 
+                        value={goal.targetAmount} 
+                        currency={currency}
+                        duration={1500}
+                        delay={800 + index * 200}
+                      />
                     </span>
                   </div>
                   <Progress 
                     value={progressValues[goal.id]} 
-                    className="h-2 transition-all duration-700 ease-in-out bg-secondary"
-                    style={{
-                      background: 'hsl(var(--secondary))',
-                    }}
-                  >
-                    <div
-                      className="h-full bg-primary transition-all duration-700 ease-in-out"
-                      style={{
-                        width: `${progressValues[goal.id]}%`,
-                        background: 'hsl(var(--primary))',
-                      }}
-                    />
-                  </Progress>
+                    className="h-3 transition-all duration-700 ease-in-out"
+                  />
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                      <CalendarIcon className="h-4 w-4" />
                       Fecha límite: {new Date(goal.deadline).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}
                     </span>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full sm:w-auto"
+                      className="w-full sm:w-auto hover:scale-105 transition-transform duration-200"
                       onClick={() => {
                         setSelectedGoalId(goal.id)
                         setShowAddFundsDialog(true)
@@ -413,7 +453,10 @@ export default function FutureGoals() {
       <Dialog open={showAddFundsDialog} onOpenChange={setShowAddFundsDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">Añadir Fondos</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Añadir Fondos
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">

@@ -69,6 +69,14 @@ export interface BudgetRule {
   updatedAt?: Date
 }
 
+export type Category = {
+  id: string
+  name: string
+  color: string
+  icon?: string
+  active: boolean
+}
+
 export const currencies: Currency[] = [
   { code: "USD", symbol: "$", name: "Dólar estadounidense" },
   { code: "EUR", symbol: "€", name: "Euro" },

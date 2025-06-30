@@ -23,6 +23,7 @@ import MonthSelector from "@/components/month-selector"
 import MonthlyCategoryBreakdown from "@/components/monthly-category-breakdown"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import DashboardLayout from "./dashboard-layout"
 
 export default function Home() {
   const [showExpenseForm, setShowExpenseForm] = useState(false)
@@ -38,7 +39,7 @@ export default function Home() {
   }
 
   const content = (
-    <div className="container mx-auto px-4 py-4 sm:py-6">
+    <div className="container w-full mx-auto px-2 sm:px-4 py-4 sm:py-6 overflow-x-auto">
       <div className="flex items-center gap-2 mb-4 sm:mb-6">
         <h1 className="text-xl sm:text-3xl font-bold truncate">Mi Presupuesto Personal</h1>
         <div className="flex items-center gap-2 shrink-0 ml-auto">
@@ -244,8 +245,11 @@ export default function Home() {
     </div>
   )
 
-  // Retornar el contenido directamente sin el ProtectedRoute
-  return content
+  return (
+    <DashboardLayout>
+      {content}
+    </DashboardLayout>
+  )
 }
 
 function ExpenseList() {

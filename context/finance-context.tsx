@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { createContext, useContext, useEffect, useState, useMemo } from "react"
-import type { Currency, Expense, FinanceData, Goal, Income, BudgetRule } from "@/lib/types"
+import type { Currency, Expense, FinanceData, Goal, Income, BudgetRule, Category } from "@/lib/types"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/context/auth-context"
 import {
@@ -87,6 +87,11 @@ type FinanceContextType = {
   updateBudgetRule: (rule: BudgetRule) => void
   deleteBudgetRule: (id: string) => void
   setActiveBudgetRule: (id: string) => void
+  categories: Category[]
+  addCategory: (category: Omit<Category, 'id' | 'active'>) => void
+  updateCategory: (id: string, updates: Partial<Omit<Category, 'id'>>) => void
+  disableCategory: (id: string) => void
+  enableCategory: (id: string) => void
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined)
@@ -859,6 +864,53 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // 2. Agregar estado inicial de categorías
+  const initialCategories: Category[] = [
+    { id: 'alimentacion', name: 'Alimentación', color: 'bg-blue-500', active: true },
+    { id: 'transporte', name: 'Transporte', color: 'bg-green-500', active: true },
+    { id: 'servicios', name: 'Servicios', color: 'bg-yellow-500', active: true },
+    { id: 'entretenimiento', name: 'Entretenimiento', color: 'bg-purple-500', active: true },
+    { id: 'salud', name: 'Salud', color: 'bg-red-500', active: true },
+    { id: 'ahorro', name: 'Ahorro', color: 'bg-teal-500', active: true },
+    { id: 'otros', name: 'Otros', color: 'bg-gray-500', active: true },
+  ]
+
+  // 3. Estado de categorías
+  const [categories, setCategories] = useState<Category[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('categories')
+      return saved ? JSON.parse(saved) : initialCategories
+    }
+    return initialCategories
+  })
+
+  // 4. Métodos CRUD
+  const addCategory = (category: Omit<Category, 'id' | 'active'>) => {
+    const newCategory: Category = {
+      ...category,
+      id: crypto.randomUUID(),
+      active: true,
+    }
+    setCategories(prev => {
+      const updated = [...prev, newCategory]
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('categories', JSON.stringify(updated))
+      }
+      return updated
+    })
+  }
+  const updateCategory = (id: string, updates: Partial<Omit<Category, 'id'>>) => {
+    setCategories(prev => {
+      const updated = prev.map(cat => cat.id === id ? { ...cat, ...updates } : cat)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('categories', JSON.stringify(updated))
+      }
+      return updated
+    })
+  }
+  const disableCategory = (id: string) => updateCategory(id, { active: false })
+  const enableCategory = (id: string) => updateCategory(id, { active: true })
+
   return (
     <FinanceContext.Provider
       value={{
@@ -884,7 +936,12 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         addBudgetRule,
         updateBudgetRule,
         deleteBudgetRule,
-        setActiveBudgetRule
+        setActiveBudgetRule,
+        categories,
+        addCategory,
+        updateCategory,
+        disableCategory,
+        enableCategory
       }}
     >
       {children}

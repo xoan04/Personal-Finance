@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -8,7 +8,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RechartsTo
 import { useFinance } from "@/context/finance-context"
 import { formatCurrency } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, Pencil, Trash2, HelpCircle } from "lucide-react"
+import { PlusCircle, Pencil, Trash2, HelpCircle, Target, TrendingUp } from "lucide-react"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -22,6 +22,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { AnimatedCounter } from "@/components/ui/animated-counter"
+import { SkeletonCard } from "@/components/ui/skeleton-card"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
 interface Category {
   name: string;
@@ -46,6 +49,16 @@ export default function BudgetOverview() {
   const { currency, budgetRules = [], activeBudgetRuleId } = data || {}
   const [showRuleForm, setShowRuleForm] = useState(false)
   const [editingRule, setEditingRule] = useState<BudgetRule | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    // Simular tiempo de carga para mostrar las animaciones
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 600)
+
+    return () => clearTimeout(timer)
+  }, [])
 
   // Regla por defecto
   const defaultRule: BudgetRule = {
@@ -188,9 +201,25 @@ export default function BudgetOverview() {
     })
   }
 
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        <div className="flex items-center justify-center gap-2 py-10">
+          <LoadingSpinner size="md" />
+          <span className="text-muted-foreground">Cargando reglas de presupuesto...</span>
+        </div>
+        <div className="flex items-center justify-center gap-2 py-10">
+          <LoadingSpinner size="md" />
+          <span className="text-muted-foreground">Cargando distribución...</span>
+        </div>
+      </div>
+    )
+  }
+
   if (totalIncome === 0) {
     return (
-      <div className="text-center py-10">
+      <div className="text-center py-10 animate-fade-in-up">
+        <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
         <p className="text-muted-foreground">
           Añade ingresos y gastos para ver tu distribución según las reglas de presupuesto
         </p>
@@ -200,10 +229,13 @@ export default function BudgetOverview() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-      <Card className="w-full">
+      <Card className="w-full animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0">
           <div>
-            <CardTitle className="text-xl md:text-2xl">Reglas de Presupuesto</CardTitle>
+            <CardTitle className="text-xl md:text-2xl flex items-center gap-2">
+              <Target className="h-6 w-6 text-primary" />
+              Reglas de Presupuesto
+            </CardTitle>
             <CardDescription className="text-sm md:text-base">
               Selecciona o crea tus propias reglas de distribución
             </CardDescription>
@@ -213,7 +245,7 @@ export default function BudgetOverview() {
               setEditingRule(null)
               setShowRuleForm(true)
             }}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto hover:scale-105 transition-transform duration-200"
           >
             <PlusCircle className="h-4 w-4 mr-2" />
             Nueva Regla
@@ -221,12 +253,13 @@ export default function BudgetOverview() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {rules.map(rule => (
+            {rules.map((rule, index) => (
               <div
                 key={rule.id}
-                className={`p-3 md:p-4 rounded-lg border ${
-                  rule.id === activeBudgetRuleId ? "border-primary bg-primary/5" : ""
-                }`}
+                className={`p-3 md:p-4 rounded-lg border transition-all duration-300 hover:shadow-md ${
+                  rule.id === activeBudgetRuleId ? "border-primary bg-primary/5 shadow-sm" : "hover:border-primary/20"
+                } animate-fade-in-up`}
+                style={{ animationDelay: `${0.2 + index * 0.1}s` }}
               >
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-2 space-y-2 sm:space-y-0">
                   <div className="w-full sm:w-auto">
@@ -245,6 +278,7 @@ export default function BudgetOverview() {
                             setEditingRule(rule)
                             setShowRuleForm(true)
                           }}
+                          className="hover:scale-110 transition-transform duration-200"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -253,7 +287,7 @@ export default function BudgetOverview() {
                           description={`¿Estás seguro de que deseas eliminar la regla "${rule.name}"? Esta acción no se puede deshacer.`}
                           onDelete={() => handleDeleteRule(rule)}
                           trigger={
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" className="hover:scale-110 transition-transform duration-200">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           }
@@ -265,7 +299,7 @@ export default function BudgetOverview() {
                         variant="outline"
                         size="sm"
                         onClick={() => setActiveBudgetRule(rule.id)}
-                        className="w-full sm:w-auto"
+                        className="w-full sm:w-auto hover:scale-105 transition-transform duration-200"
                       >
                         Activar
                       </Button>
@@ -273,10 +307,10 @@ export default function BudgetOverview() {
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {rule.categories.map(category => (
+                  {rule.categories.map((category, catIndex) => (
                     <div
                       key={category.name}
-                      className="text-center p-2 rounded relative flex flex-row sm:flex-col items-center justify-between sm:justify-center space-x-2 sm:space-x-0"
+                      className="text-center p-2 rounded-lg relative flex flex-row sm:flex-col items-center justify-between sm:justify-center space-x-2 sm:space-x-0 transition-all duration-300 hover:scale-105"
                       style={{ backgroundColor: `${category.color}20` }}
                     >
                       <div className="flex items-center gap-1">
@@ -306,16 +340,19 @@ export default function BudgetOverview() {
         </CardContent>
       </Card>
 
-      <Card className="w-full">
+      <Card className="w-full animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
         <CardHeader>
-          <CardTitle className="text-xl md:text-2xl">Distribución Actual</CardTitle>
+          <CardTitle className="text-xl md:text-2xl flex items-center gap-2">
+            <TrendingUp className="h-6 w-6 text-primary" />
+            Distribución Actual
+          </CardTitle>
           <CardDescription className="text-sm md:text-base">
             Basado en la regla {activeRule.name}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            <div className="aspect-square w-full max-w-[300px] mx-auto">
+            <div className="aspect-square w-full max-w-[300px] mx-auto animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -340,8 +377,8 @@ export default function BudgetOverview() {
             </div>
 
             <div className="space-y-4">
-              {categoryValues.map((category) => (
-                <div key={category.name} className="space-y-2">
+              {categoryValues.map((category, index) => (
+                <div key={category.name} className="space-y-2 animate-fade-in-up" style={{ animationDelay: `${0.5 + index * 0.1}s` }}>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-1 sm:space-y-0">
                     <div className="flex items-center gap-1">
                       <span className="font-medium">{category.name}</span>
@@ -361,7 +398,17 @@ export default function BudgetOverview() {
                       </TooltipProvider>
                     </div>
                     <div className="text-sm text-muted-foreground w-full sm:w-auto text-right">
-                      {formatCurrency(category.current, currency)} / {formatCurrency(category.target, currency)}
+                      <AnimatedCounter 
+                        value={category.current} 
+                        currency={currency}
+                        duration={1500}
+                        delay={800 + index * 200}
+                      /> / <AnimatedCounter 
+                        value={category.target} 
+                        currency={currency}
+                        duration={1500}
+                        delay={1000 + index * 200}
+                      />
                     </div>
                   </div>
                   <Progress value={category.percent} className="h-2" />

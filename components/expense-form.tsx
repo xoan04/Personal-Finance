@@ -34,7 +34,7 @@ export interface ExpenseFormProps {
 }
 
 export function ExpenseForm({ onClose, editingExpense }: ExpenseFormProps) {
-  const { addExpense, updateExpense, data } = useFinance()
+  const { addExpense, updateExpense, data, categories } = useFinance()
   const { currency } = data
   const [date, setDate] = useState(
     editingExpense?.date 
@@ -160,13 +160,9 @@ export function ExpenseForm({ onClose, editingExpense }: ExpenseFormProps) {
                 <SelectValue placeholder="Selecciona una categoría" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="alimentacion">Alimentación</SelectItem>
-                <SelectItem value="transporte">Transporte</SelectItem>
-                <SelectItem value="servicios">Servicios</SelectItem>
-                <SelectItem value="entretenimiento">Entretenimiento</SelectItem>
-                <SelectItem value="salud">Salud</SelectItem>
-                <SelectItem value="ahorro">Ahorro</SelectItem>
-                <SelectItem value="otros">Otros</SelectItem>
+                {categories.filter(cat => cat.active).map(cat => (
+                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
