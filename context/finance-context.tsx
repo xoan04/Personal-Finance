@@ -17,6 +17,7 @@ import {
   query,
   where,
   getDocs,
+  onSnapshot,
 } from "firebase/firestore"
 
 // Datos iniciales vacíos
@@ -124,7 +125,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const filterTransactionsByMonth = (transactions: any[], monthString: string) => {
     const [year, month] = monthString.split('-').map(Number)
     return transactions.filter(transaction => {
-      const [tYear, tMonth] = transaction.date.split('-').map(Number)
+      // Extraer solo año y mes de la fecha de la transacción (ignorar el día)
+      const transactionDate = new Date(transaction.date)
+      const tYear = transactionDate.getFullYear()
+      const tMonth = transactionDate.getMonth() + 1 // getMonth() devuelve 0-11, necesitamos 1-12
+      
       return tYear === year && tMonth === month
     })
   }
@@ -242,6 +247,30 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     loadData()
   }, [user])
 
+  // Listener en tiempo real para transacciones
+  useEffect(() => {
+    if (!user) return
+
+    const transactionsRef = doc(db, "transactions", user.uid)
+    const unsubscribe = onSnapshot(transactionsRef, (doc) => {
+      if (doc.exists()) {
+        const userTransactions = doc.data()
+        
+        setData(prev => ({
+          ...prev,
+          expenses: userTransactions.expenses || [],
+          incomes: userTransactions.incomes || [],
+        }))
+      }
+    }, (error) => {
+      console.error("Error en listener de transacciones:", error)
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [user])
+
   // Actualizar datos locales cuando cambian los datos
   useEffect(() => {
     if (!user) {
@@ -350,12 +379,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             updatedAt: new Date()
           })
         }
+      } else {
+        // Solo actualizar estado local si no hay usuario (modo offline)
+        setData(prev => ({
+          ...prev,
+          expenses: [...prev.expenses, newExpense],
+        }))
       }
-
-      setData(prev => ({
-        ...prev,
-        expenses: [...prev.expenses, newExpense],
-      }))
     } catch (error) {
       console.error("Error al añadir gasto:", error)
       throw error
@@ -382,31 +412,32 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             updatedAt: new Date()
           })
         }
-      }
 
-      // Si el gasto está relacionado con una meta y ha cambiado el monto
-      if (originalExpense?.category === "ahorro" && originalExpense?.notes?.includes("Fondos para meta:")) {
-        const goalTitle = originalExpense.notes.split("Fondos para meta:")[1].trim()
-        const goal = data.goals.find(g => g.title === goalTitle)
-        
-        if (goal) {
-          // Si se cambió la categoría o se cambió el monto
-          if (expenseToUpdate.category !== "ahorro" || expenseToUpdate.amount !== originalExpense.amount) {
-            const updatedGoal = {
-              ...goal,
-              currentAmount: goal.currentAmount - originalExpense.amount + (expenseToUpdate.category === "ahorro" ? expenseToUpdate.amount : 0)
+        // Si el gasto está relacionado con una meta y ha cambiado el monto
+        if (originalExpense?.category === "ahorro" && originalExpense?.notes?.includes("Fondos para meta:")) {
+          const goalTitle = originalExpense.notes.split("Fondos para meta:")[1].trim()
+          const goal = data.goals.find(g => g.title === goalTitle)
+          
+          if (goal) {
+            // Si se cambió la categoría o se cambió el monto
+            if (expenseToUpdate.category !== "ahorro" || expenseToUpdate.amount !== originalExpense.amount) {
+              const updatedGoal = {
+                ...goal,
+                currentAmount: goal.currentAmount - originalExpense.amount + (expenseToUpdate.category === "ahorro" ? expenseToUpdate.amount : 0)
+              }
+              await updateGoal(updatedGoal)
             }
-            await updateGoal(updatedGoal)
           }
         }
+      } else {
+        // Solo actualizar estado local si no hay usuario (modo offline)
+        setData(prev => ({
+          ...prev,
+          expenses: prev.expenses.map(expense =>
+            expense.id === expenseToUpdate.id ? expenseToUpdate : expense
+          ),
+        }))
       }
-
-      setData(prev => ({
-        ...prev,
-        expenses: prev.expenses.map(expense =>
-          expense.id === expenseToUpdate.id ? expenseToUpdate : expense
-        ),
-      }))
     } catch (error) {
       console.error("Error al actualizar gasto:", error)
       throw error
@@ -449,13 +480,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             updatedAt: new Date()
           })
         }
+      } else {
+        // Solo actualizar estado local si no hay usuario (modo offline)
+        setData(prev => ({
+          ...prev,
+          expenses: prev.expenses.filter(expense => expense.id !== id),
+        }))
       }
-
-      // Finalmente actualizar el estado local
-      setData(prev => ({
-        ...prev,
-        expenses: prev.expenses.filter(expense => expense.id !== id),
-      }))
 
     } catch (error) {
       console.error("Error al eliminar gasto:", error)
@@ -489,12 +520,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             updatedAt: new Date()
           })
         }
+      } else {
+        // Solo actualizar estado local si no hay usuario (modo offline)
+        setData(prev => ({
+          ...prev,
+          incomes: [...prev.incomes, newIncome],
+        }))
       }
-
-      setData(prev => ({
-        ...prev,
-        incomes: [...prev.incomes, newIncome],
-      }))
     } catch (error) {
       console.error("Error al añadir ingreso:", error)
       throw error
@@ -518,14 +550,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             updatedAt: new Date()
           })
         }
+      } else {
+        // Solo actualizar estado local si no hay usuario (modo offline)
+        setData(prev => ({
+          ...prev,
+          incomes: prev.incomes.map(income =>
+            income.id === incomeToUpdate.id ? incomeToUpdate : income
+          ),
+        }))
       }
-
-      setData(prev => ({
-        ...prev,
-        incomes: prev.incomes.map(income =>
-          income.id === incomeToUpdate.id ? incomeToUpdate : income
-        ),
-      }))
     } catch (error) {
       console.error("Error al actualizar ingreso:", error)
       throw error
@@ -547,12 +580,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             updatedAt: new Date()
           })
         }
+      } else {
+        // Solo actualizar estado local si no hay usuario (modo offline)
+        setData(prev => ({
+          ...prev,
+          incomes: prev.incomes.filter(income => income.id !== id),
+        }))
       }
-
-      setData(prev => ({
-        ...prev,
-        incomes: prev.incomes.filter(income => income.id !== id),
-      }))
     } catch (error) {
       console.error("Error al eliminar ingreso:", error)
       throw error

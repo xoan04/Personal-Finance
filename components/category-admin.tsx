@@ -71,12 +71,12 @@ export default function CategoryAdmin() {
           <div className="space-y-2">
             <label className="text-sm font-medium">Color</label>
             <div className="flex gap-2 items-center">
-              <Input
-                placeholder="Color (ej: bg-pink-500)"
-                value={form.color}
-                onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
-                required
-              />
+          <Input
+            placeholder="Color (ej: bg-pink-500)"
+            value={form.color}
+            onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
+            required
+          />
               {form.color && (
                 <div 
                   className="w-8 h-8 rounded border"

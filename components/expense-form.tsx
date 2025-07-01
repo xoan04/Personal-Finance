@@ -36,11 +36,7 @@ export interface ExpenseFormProps {
 export function ExpenseForm({ onClose, editingExpense }: ExpenseFormProps) {
   const { addExpense, updateExpense, data, categories } = useFinance()
   const { currency } = data
-  const [date, setDate] = useState(
-    editingExpense?.date 
-      ? new Date(editingExpense.date).toISOString().split("T")[0]
-      : new Date().toISOString().split("T")[0]
-  )
+  const [date, setDate] = useState<Date>(editingExpense ? new Date(editingExpense.date) : new Date())
   const [description, setDescription] = useState(editingExpense?.description || "")
   const [amount, setAmount] = useState<string>(editingExpense?.amount?.toString() || "")
   const [formattedAmount, setFormattedAmount] = useState("")
@@ -74,62 +70,88 @@ export function ExpenseForm({ onClose, editingExpense }: ExpenseFormProps) {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!description || !amount || !category) return
 
-    const expenseData = {
-      description,
-      amount: parseFloat(amount.replace(/[^\d]/g, "")),
-      date: date,
-      category,
-      notes,
-    }
-
-    if (editingExpense) {
-      updateExpense({
-        ...expenseData,
-        id: editingExpense.id
+    if (!description || !amount || !category || !date) {
+      toast({
+        title: "Error",
+        description: "Por favor completa todos los campos requeridos",
+        variant: "destructive",
       })
-    } else {
-      addExpense(expenseData)
+      return
     }
 
-    // Reset form
-    setDescription("")
-    setAmount("")
-    setFormattedAmount("")
-    setDate(new Date().toISOString().split("T")[0])
-    setCategory("")
-    setNotes("")
-    if (onClose) onClose()
+    try {
+      const expenseData = {
+        description,
+        amount: parseFloat(amount.replace(/[^\d]/g, "")),
+        date: date.toISOString().split("T")[0],
+        category,
+        notes,
+      }
+
+      if (editingExpense) {
+        await updateExpense({
+          ...expenseData,
+          id: editingExpense.id
+        })
+        toast({
+          title: "Gasto actualizado",
+          description: "El gasto ha sido actualizado correctamente",
+        })
+      } else {
+        await addExpense(expenseData)
+        toast({
+          title: "Gasto añadido",
+          description: "El gasto ha sido registrado correctamente",
+        })
+      }
+
+      onClose?.()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Hubo un error al procesar el gasto",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-background rounded-lg w-full max-w-md p-6 shadow-lg">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold">
-            {editingExpense ? "Editar Gasto" : "Agregar Gasto"}
-          </h2>
-          {onClose && (
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-background rounded-lg w-full max-w-md p-4 sm:p-6 relative max-h-[90vh] overflow-y-auto">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="absolute right-2 sm:right-4 top-2 sm:top-4" 
+          onClick={() => onClose?.()}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+
+        <h2 className="text-lg sm:text-xl font-bold mb-4">
+          {editingExpense ? "Editar Gasto" : "Agregar Gasto"}
+        </h2>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="description">Descripción</Label>
+            <Label htmlFor="description" className="text-sm font-medium">
+              Descripción
+            </Label>
             <Input
               id="description"
+              placeholder="Descripción del gasto"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descripción del gasto"
+              required
+              className="w-full"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="amount">Monto</Label>
+            <Label htmlFor="amount" className="text-sm font-medium">
+              Monto
+            </Label>
             <div className="relative">
               <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">
                 {currency.symbol}
@@ -137,29 +159,24 @@ export function ExpenseForm({ onClose, editingExpense }: ExpenseFormProps) {
               <Input
                 id="amount"
                 type="text"
+                inputMode="numeric"
+                className="pl-7 w-full"
+                placeholder="0"
                 value={formattedAmount}
                 onChange={handleAmountChange}
-                placeholder="0"
-                className="pl-7 w-full"
+                required
               />
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="date">Fecha</Label>
-            <Input
-              id="date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="category">Categoría</Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger>
+            <Label htmlFor="category" className="text-sm font-medium">
+              Categoría
+            </Label>
+            <Select value={category} onValueChange={setCategory} required>
+              <SelectTrigger id="category" className="w-full">
                 <SelectValue placeholder="Selecciona una categoría" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[200px]">
                 {categories.filter(cat => cat.active).map(cat => (
                   <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                 ))}
@@ -167,19 +184,56 @@ export function ExpenseForm({ onClose, editingExpense }: ExpenseFormProps) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="notes">Notas (opcional)</Label>
+            <Label className="text-sm font-medium">Fecha</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant={"outline"} 
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !date && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date ? format(date, "PPP", { locale: es }) : "Selecciona una fecha"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar 
+                  mode="single" 
+                  selected={date} 
+                  onSelect={(date) => date && setDate(date)} 
+                  initialFocus 
+                  className="rounded-md border"
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="notes" className="text-sm font-medium">
+              Notas (opcional)
+            </Label>
             <Textarea
               id="notes"
+              placeholder="Notas adicionales"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Notas adicionales"
+              className="w-full min-h-[100px]"
             />
           </div>
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="outline" onClick={onClose}>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onClose?.()}
+              className="w-full sm:w-auto"
+            >
               Cancelar
             </Button>
-            <Button type="submit">
+            <Button 
+              type="submit"
+              className="w-full sm:w-auto"
+            >
               {editingExpense ? "Actualizar" : "Agregar"}
             </Button>
           </div>
