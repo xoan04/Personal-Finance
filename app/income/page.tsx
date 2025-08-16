@@ -5,6 +5,23 @@ import { useFinance } from "@/context/finance-context"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import MonthSelector from "@/components/month-selector"
+
+// Función para formatear fechas de forma segura
+const formatDate = (date: Date | string) => {
+  const dateObj = date instanceof Date ? date : new Date(date)
+  if (isNaN(dateObj.getTime())) {
+    return "Fecha inválida"
+  }
+  return format(dateObj, "dd 'de' MMMM", { locale: es })
+}
+
+const formatDateFull = (date: Date | string) => {
+  const dateObj = date instanceof Date ? date : new Date(date)
+  if (isNaN(dateObj.getTime())) {
+    return "Fecha inválida"
+  }
+  return format(dateObj, "dd 'de' MMMM 'de' yyyy", { locale: es })
+}
 import { useState } from "react"
 import IncomeForm from "@/components/income-form"
 import { Eye, Pencil, Trash2, Plus } from "lucide-react"
@@ -21,9 +38,7 @@ function IncomeList() {
 
   // Ordenar ingresos por fecha (más recientes primero)
   const sortedIncomes = [...monthlyData.incomes].sort((a, b) => {
-    const dateA = new Date(a.date)
-    const dateB = new Date(b.date)
-    return dateB.getTime() - dateA.getTime()
+    return b.date.getTime() - a.date.getTime()
   })
 
   if (!monthlyData.incomes.length) return <div className="text-sm text-gray-500">No hay ingresos registrados este mes.</div>
@@ -46,7 +61,7 @@ function IncomeList() {
               <tr key={inc.id} className="border-b hover:bg-gray-50">
                 <td className="px-4 py-2">{inc.description}</td>
                 <td className="px-4 py-2 text-center text-sm text-gray-600">
-                  {format(new Date(inc.date), "dd 'de' MMMM", { locale: es })}
+                  {formatDate(inc.date)}
                 </td>
                 <td className="px-4 py-2 text-right font-semibold text-green-600">${inc.amount.toLocaleString()}</td>
                 <td className="px-2 py-2 text-center">
@@ -73,7 +88,7 @@ function IncomeList() {
             <div className="space-y-2">
               <div><b>Descripción:</b> {selected.description}</div>
               <div><b>Monto:</b> <span className="text-green-600 font-semibold">${selected.amount.toLocaleString()}</span></div>
-              <div><b>Fecha:</b> {format(new Date(selected.date), "dd 'de' MMMM 'de' yyyy", { locale: es })}</div>
+              <div><b>Fecha:</b> {formatDateFull(selected.date)}</div>
               <div><b>Categoría:</b> {selected.category}</div>
             </div>
           )}
@@ -107,6 +122,9 @@ export default function IncomePage() {
   const [showAddForm, setShowAddForm] = useState(false)
   
   const formatSelectedMonth = () => {
+    if (selectedMonth === "all") {
+      return "Todos los meses"
+    }
     const [year, month] = selectedMonth.split('-').map(Number)
     const date = new Date(year, month - 1, 1)
     return format(date, "MMMM 'de' yyyy", { locale: es })

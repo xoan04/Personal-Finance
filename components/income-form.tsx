@@ -16,6 +16,14 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { CalendarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+// Función para formatear fechas de forma segura
+const formatDate = (date: Date) => {
+  if (!date || isNaN(date.getTime())) {
+    return "Selecciona una fecha"
+  }
+  return format(date, "PPP", { locale: es })
+}
 import { useFinance } from "@/context/finance-context"
 import { toast } from "@/components/ui/use-toast"
 
@@ -34,7 +42,14 @@ const formatNumber = (value: string) => {
 export default function IncomeForm({ onClose, editingIncome }: IncomeFormProps) {
   const { addIncome, updateIncome, data } = useFinance()
   const { currency } = data
-  const [date, setDate] = useState<Date>(editingIncome ? new Date(editingIncome.date) : new Date())
+  const [date, setDate] = useState<Date>(() => {
+    if (editingIncome?.date) {
+      // Asegurar que la fecha sea un Date object válido
+      const dateObj = editingIncome.date instanceof Date ? editingIncome.date : new Date(editingIncome.date)
+      return isNaN(dateObj.getTime()) ? new Date() : dateObj
+    }
+    return new Date()
+  })
   const [description, setDescription] = useState(editingIncome?.description || "")
   const [amount, setAmount] = useState(editingIncome?.amount.toString() || "")
   const [formattedAmount, setFormattedAmount] = useState(
@@ -69,7 +84,7 @@ export default function IncomeForm({ onClose, editingIncome }: IncomeFormProps) 
         description,
         amount: Number(amount),
         category,
-        date: date.toISOString().split("T")[0],
+        date: date,
         notes,
       }
 
@@ -183,7 +198,7 @@ export default function IncomeForm({ onClose, editingIncome }: IncomeFormProps) 
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "PPP", { locale: es }) : "Selecciona una fecha"}
+                  {formatDate(date)}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">

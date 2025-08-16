@@ -20,6 +20,41 @@ import {
   onSnapshot,
 } from "firebase/firestore"
 
+// Función para convertir fechas de forma segura
+const convertDates = (items: any[]) => {
+  return items.map(item => ({
+    ...item,
+    date: (() => {
+      // Si ya es un Date object válido, usarlo
+      if (item.date instanceof Date && !isNaN(item.date.getTime())) {
+        return item.date
+      }
+      // Si es un string en formato YYYY-MM-DD, crear la fecha en zona horaria local
+      if (typeof item.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.date)) {
+        const [year, month, day] = item.date.split('-').map(Number)
+        return new Date(year, month - 1, day)
+      }
+      // Si es un timestamp de Firestore o cualquier otro formato
+      if (item.date && typeof item.date === 'object' && item.date.toDate) {
+        return item.date.toDate()
+      }
+      // Intentar crear una nueva fecha
+      const newDate = new Date(item.date)
+      return isNaN(newDate.getTime()) ? new Date() : newDate
+    })(),
+    createdAt: (() => {
+      if (item.createdAt instanceof Date && !isNaN(item.createdAt.getTime())) {
+        return item.createdAt
+      }
+      if (item.createdAt && typeof item.createdAt === 'object' && item.createdAt.toDate) {
+        return item.createdAt.toDate()
+      }
+      const newDate = new Date(item.createdAt)
+      return isNaN(newDate.getTime()) ? new Date() : newDate
+    })()
+  }))
+}
+
 // Datos iniciales vacíos
 const initialData: FinanceData = {
   expenses: [],
@@ -123,6 +158,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   // Función para filtrar transacciones por mes
   const filterTransactionsByMonth = (transactions: any[], monthString: string) => {
+    // Si es "all", devolver todas las transacciones
+    if (monthString === "all") {
+      return transactions
+    }
+    
     const [year, month] = monthString.split('-').map(Number)
     return transactions.filter(transaction => {
       // Extraer solo año y mes de la fecha de la transacción (ignorar el día)
@@ -201,10 +241,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           // Cargar datos básicos del usuario
           const userData = userDoc.data() as { currency: Currency; activeBudgetRuleId: string }
 
+          const convertedExpenses = convertDates(userTransactions.expenses || [])
+          const convertedIncomes = convertDates(userTransactions.incomes || [])
+          
           setData({
             ...initialData,
-            expenses: userTransactions.expenses || [],
-            incomes: userTransactions.incomes || [],
+            expenses: convertedExpenses,
+            incomes: convertedIncomes,
             goals: userGoals,
             currency: userData.currency || initialData.currency,
             budgetRules: [initialData.budgetRules[0], ...customBudgetRules],
@@ -258,8 +301,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         
         setData(prev => ({
           ...prev,
-          expenses: userTransactions.expenses || [],
-          incomes: userTransactions.incomes || [],
+          expenses: convertDates(userTransactions.expenses || []),
+          incomes: convertDates(userTransactions.incomes || []),
         }))
       }
     }, (error) => {
@@ -707,14 +750,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         currentAmount: goalToUpdate.currentAmount + amount,
       }
 
-      // Crear un gasto correspondiente a los fondos añadidos
-      const expenseData = {
-        description: `Fondos para meta: ${goalToUpdate.title}`,
-        amount: amount,
-        date: new Date().toISOString().split("T")[0], // Formato YYYY-MM-DD consistente
-        category: "ahorro",
-        notes: `Fondos para meta: ${goalToUpdate.title}`, // Formato consistente para identificar la meta
-      }
+             // Crear un gasto correspondiente a los fondos añadidos
+       const expenseData = {
+         description: `Fondos para meta: ${goalToUpdate.title}`,
+         amount: amount,
+         date: new Date(),
+         category: "ahorro",
+         notes: `Fondos para meta: ${goalToUpdate.title}`, // Formato consistente para identificar la meta
+       }
 
       // Actualizar la meta y añadir el gasto
       await Promise.all([

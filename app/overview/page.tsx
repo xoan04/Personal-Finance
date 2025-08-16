@@ -30,6 +30,9 @@ export default function OverviewPage() {
   }, [])
 
   const formatSelectedMonth = () => {
+    if (selectedMonth === "all") {
+      return "Todos los meses"
+    }
     const [year, month] = selectedMonth.split('-').map(Number)
     const date = new Date(year, month - 1, 1)
     return format(date, "MMMM 'de' yyyy", { locale: es })

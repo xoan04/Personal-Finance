@@ -5,6 +5,24 @@ import { useFinance } from "@/context/finance-context"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import MonthSelector from "@/components/month-selector"
+
+// Función para formatear fechas de forma segura
+const formatDate = (date: Date | string) => {
+  const dateObj = date instanceof Date ? date : new Date(date)
+  if (isNaN(dateObj.getTime())) {
+    return "Fecha inválida"
+  }
+  return format(dateObj, "dd 'de' MMMM", { locale: es })
+}
+
+const formatDateFull = (date: Date | string) => {
+  const dateObj = date instanceof Date ? date : new Date(date)
+  if (isNaN(dateObj.getTime())) {
+    return "Fecha inválida"
+  }
+  return format(dateObj, "dd 'de' MMMM 'de' yyyy", { locale: es })
+}
+
 import { useState } from "react"
 import { ExpenseForm } from "@/components/expense-form"
 import { Eye, Pencil, Trash2, Plus } from "lucide-react"
@@ -21,9 +39,7 @@ function ExpenseList() {
 
   // Ordenar gastos por fecha (más recientes primero)
   const sortedExpenses = [...monthlyData.expenses].sort((a, b) => {
-    const dateA = new Date(a.date)
-    const dateB = new Date(b.date)
-    return dateB.getTime() - dateA.getTime()
+    return b.date.getTime() - a.date.getTime()
   })
 
   if (!monthlyData.expenses.length) return <div className="text-sm text-gray-500">No hay gastos registrados este mes.</div>
@@ -46,7 +62,7 @@ function ExpenseList() {
               <tr key={exp.id} className="border-b hover:bg-gray-50">
                 <td className="px-4 py-2">{exp.description}</td>
                 <td className="px-4 py-2 text-center text-sm text-gray-600">
-                  {format(new Date(exp.date), "dd 'de' MMMM", { locale: es })}
+                  {formatDate(exp.date)}
                 </td>
                 <td className="px-4 py-2 text-right font-semibold text-red-600">${exp.amount.toLocaleString()}</td>
                 <td className="px-2 py-2 text-center">
@@ -73,7 +89,7 @@ function ExpenseList() {
             <div className="space-y-2">
               <div><b>Descripción:</b> {selected.description}</div>
               <div><b>Monto:</b> <span className="text-red-600 font-semibold">${selected.amount.toLocaleString()}</span></div>
-              <div><b>Fecha:</b> {format(new Date(selected.date), "dd 'de' MMMM 'de' yyyy", { locale: es })}</div>
+              <div><b>Fecha:</b> {formatDateFull(selected.date)}</div>
               <div><b>Categoría:</b> {selected.category}</div>
             </div>
           )}
@@ -107,6 +123,9 @@ export default function ExpensesPage() {
   const [showAddForm, setShowAddForm] = useState(false)
   
   const formatSelectedMonth = () => {
+    if (selectedMonth === "all") {
+      return "Todos los meses"
+    }
     const [year, month] = selectedMonth.split('-').map(Number)
     const date = new Date(year, month - 1, 1)
     return format(date, "MMMM 'de' yyyy", { locale: es })

@@ -4,7 +4,7 @@ export interface Expense {
   description: string
   amount: number
   category: string
-  date: string
+  date: Date
   notes?: string
   userId?: string
   createdAt?: Date
@@ -15,7 +15,7 @@ export interface Income {
   description: string
   amount: number
   category: string
-  date: string
+  date: Date
   notes?: string
   userId?: string
   createdAt?: Date
